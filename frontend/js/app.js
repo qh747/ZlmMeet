@@ -10,6 +10,14 @@
 import { Signaling } from './signaling.js';
 import { publishStream, playStream, closePC } from './webrtc.js';
 import { MeetingUI } from './ui.js';
+import {
+  getStoredQuality,
+  getVideoConstraints,
+  getQualityLabel,
+  replaceVideoTrackInPC,
+  swapStreamVideoTrack,
+  wireQualityUI,
+} from './quality.js';
 
 // Resolve mode: meeting.html uses 'meeting'; call.html uses 'call'.
 const urlParams = new URLSearchParams(location.search);
@@ -25,6 +33,7 @@ const state = {
   room: sessionStorage.getItem('zlm.room') || '',
   micOn: true,
   camOn: true,
+  quality: getStoredQuality(),
 
   localCamStream: null,     // MediaStream from getUserMedia
   camPub: null,             // { pc, streamId }
@@ -88,11 +97,7 @@ async function main() {
   const mediaPromise = navigator.mediaDevices
     .getUserMedia({
       audio: true,
-      video: {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        frameRate: { ideal: 24, max: 30 },
-      },
+      video: getVideoConstraints(state.quality),
     })
     .catch((err) => {
       ui.showStatus('无法访问摄像头/麦克风：' + err.message, { error: true, durationMs: 0 });
@@ -336,6 +341,12 @@ function wireToolbar() {
   if (previewClose) previewClose.addEventListener('click', closePreview);
   if (previewCloseBtn) previewCloseBtn.addEventListener('click', closePreview);
   if (previewDownload) previewDownload.addEventListener('click', downloadPreview);
+
+  wireQualityUI({
+    isCamOn: () => state.camOn,
+    getCurrent: () => state.quality,
+    onApply: applyQuality,
+  });
 }
 
 function applyRecordState(p) {
@@ -419,6 +430,47 @@ function toggleCam() {
   }
   ui.setButtonState('btnCam', state.camOn ? '' : 'off');
   state.signaling.send('media-state', { micOn: state.micOn, camOn: state.camOn });
+}
+
+async function applyQuality(qualityKey) {
+  if (!state.camOn) return false;
+  if (qualityKey === state.quality) return true;
+
+  let videoOnly;
+  try {
+    videoOnly = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: getVideoConstraints(qualityKey),
+    });
+  } catch (err) {
+    console.warn('[quality]', err);
+    ui.showStatus('画质切换失败：' + err.message, { error: true });
+    return false;
+  }
+
+  const newVideoTrack = videoOnly.getVideoTracks()[0];
+  if (!newVideoTrack) {
+    videoOnly.getTracks().forEach((t) => t.stop());
+    return false;
+  }
+  newVideoTrack.enabled = state.camOn;
+
+  swapStreamVideoTrack(state.localCamStream, newVideoTrack);
+  ui.upsertTile('self', { stream: state.localCamStream });
+
+  if (state.camPub?.pc) {
+    try {
+      await replaceVideoTrackInPC(state.camPub.pc, newVideoTrack);
+    } catch (err) {
+      console.warn('[quality replaceTrack]', err);
+      ui.showStatus('画质切换失败：' + err.message, { error: true });
+      return false;
+    }
+  }
+
+  state.quality = qualityKey;
+  ui.showStatus('画质已切换为' + getQualityLabel(qualityKey));
+  return true;
 }
 
 async function toggleScreen() {

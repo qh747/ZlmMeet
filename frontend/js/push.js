@@ -4,6 +4,14 @@
 
 import { Signaling } from './signaling.js';
 import { publishStream, closePC } from './webrtc.js';
+import {
+  getStoredQuality,
+  getVideoConstraints,
+  getQualityLabel,
+  replaceVideoTrackInPC,
+  swapStreamVideoTrack,
+  wireQualityUI,
+} from './quality.js';
 
 const room = sessionStorage.getItem('zlm.room') || '';
 const streamId = sessionStorage.getItem('zlm.streamId') || '';
@@ -17,6 +25,7 @@ const state = {
   localStream: null,
   micOn: true,
   camOn: true,
+  quality: getStoredQuality(),
   recording: false,
   joined: false,
 };
@@ -64,7 +73,10 @@ main().catch((err) => {
 async function main() {
   // Preview the camera ASAP.
   try {
-    state.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    state.localStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: getVideoConstraints(state.quality),
+    });
   } catch (err) {
     setStatus('无法访问摄像头/麦克风：' + err.message, true, 0);
     throw err;
@@ -150,6 +162,53 @@ function wireToolbar() {
   previewClose.addEventListener('click', closePreview);
   previewCloseBtn.addEventListener('click', closePreview);
   previewDownload.addEventListener('click', downloadPreview);
+
+  wireQualityUI({
+    isCamOn: () => state.camOn,
+    getCurrent: () => state.quality,
+    onApply: applyQuality,
+  });
+}
+
+async function applyQuality(qualityKey) {
+  if (!state.camOn) return false;
+  if (qualityKey === state.quality) return true;
+
+  let videoOnly;
+  try {
+    videoOnly = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: getVideoConstraints(qualityKey),
+    });
+  } catch (err) {
+    console.warn('[quality]', err);
+    setStatus('画质切换失败：' + err.message, true);
+    return false;
+  }
+
+  const newVideoTrack = videoOnly.getVideoTracks()[0];
+  if (!newVideoTrack) {
+    videoOnly.getTracks().forEach((t) => t.stop());
+    return false;
+  }
+  newVideoTrack.enabled = state.camOn;
+
+  swapStreamVideoTrack(state.localStream, newVideoTrack);
+  document.getElementById('localVideo').srcObject = state.localStream;
+
+  if (state.pub?.pc) {
+    try {
+      await replaceVideoTrackInPC(state.pub.pc, newVideoTrack);
+    } catch (err) {
+      console.warn('[quality replaceTrack]', err);
+      setStatus('画质切换失败：' + err.message, true);
+      return false;
+    }
+  }
+
+  state.quality = qualityKey;
+  setStatus('画质已切换为' + getQualityLabel(qualityKey));
+  return true;
 }
 
 async function toggleStream() {
