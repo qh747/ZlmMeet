@@ -19,11 +19,3 @@ zlm:
   api_base: "http://192.168.31.76:8081"
   # ZLM 配置中的 general.secret
   secret: "IqZLFoY9Kbzr2JjkRT3LSDxwzicnvetN"
-# 
-# 建议在 ZLMediaKit 的 config.ini 中配置录制完成回调，使录制预览
-# 即时可用，无需轮询等待：
-#   [hook]
-#   on_record_mp4 = https://192.168.31.76:8080/api/zlm-hook/record-mp4
-# 注意：若上方 tls_cert/tls_key 已配置（服务以 HTTPS 监听），hook 地址
-# 必须使用 https://，否则 ZLM 会收到 400（Client sent an HTTP request to an HTTPS server）。
-# 自签证书仅会在 ZLM 日志中打印警告，不影响 hook 功能。

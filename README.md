@@ -6,7 +6,7 @@
 [![](https://img.shields.io/badge/PRs-welcome-yellow.svg)]()
 [![](https://img.shields.io/badge/requires-ZLMediaKit-orange.svg)](https://github.com/ZLMediaKit/ZLMediaKit)
 
-> 一个基于 **ZLMediaKit + Go + WebRTC** 的最小可用多人视频会议示例。
+> 一个基于 **ZLMediaKit + Go + WebRTC** 的最小可用多人视频会议示例，内置四种业务入口。
 
 ```
 浏览器 ──(WebSocket 信令)── Go 后端 ──(HTTP REST)── ZLMediaKit
@@ -18,51 +18,82 @@
 
 - 依托 ZLMediaKit 作为媒体服务，WebRTC 推拉流开箱即用，无需自行实现 SFU。
 - 后端使用 Go + WebSocket 实现信令，代码极简，易于二次开发。
-- 前端零构建依赖，纯原生 HTML/JS，浏览器直开即用。
+- 前端零构建依赖，纯原生 HTML/JS（ES Module），浏览器直开即用。
+- 首页统一入口，支持 **多人会议 / 1v1 通话 / 独立推流 / 独立拉流** 四种业务。
 - 每个用户独立推流（`cam` + 可选 `screen`），其他人各自订阅，互不耦合。
 - 「房间号」即 ZLM `app`，同房间共享一个流分组；会议/通话流名后端固定为 `user_<userId>_<kind>`，独立推/拉流由用户输入流名。
-- 支持麦克风/摄像头热切换、屏幕共享、文字聊天。
+- 支持麦克风/摄像头热切换、屏幕共享、文字聊天、画质档位切换、MP4 录制与预览下载。
 
 ## 项目定位
 
 - 学习 WebRTC + ZLMediaKit 信令交互的最小参考实现。
 - 可作为二次开发基础，扩展鉴权、录制、转推等生产特性。
 
+## 业务说明
+
+首页（`/`）提供四张业务卡片，填写表单后进入对应页面。支持深链直达：`/?biz=meeting|call|push|play`。
+
+| 业务 | 页面 | 房间模式 | 人数限制 | 说明 |
+|------|------|----------|----------|------|
+| 多人会议 | `meeting.html` | `meeting` | 无 | 多人音视频、屏幕共享、聊天、录制 |
+| 1v1 通话 | `call.html` | `call` | 最多 2 人 | 大画面 + 自视图小窗，功能与会议类似 |
+| 推流 | `push.html` | `solo` | 无 | 输入房间号 + 流名，将本机摄像头推到 ZLM |
+| 拉流 | `play.html` | `solo` | 无 | 输入房间号 + 流名，从 ZLM 拉流播放 |
+
+**房间号与流名约定**
+
+- 前端「房间号」→ ZLM 的 `app` 字段；同一房间号的用户处于同一 ZLM 流分组。
+- 会议/通话：后端自动生成流名 `user_<userId>_cam` / `user_<userId>_screen`。
+- 独立推/拉流：用户自定义流名（仅字母数字、`_`、`-`、`.`，最长 128 字符）。
+
 ## 功能清单
 
-- 业务选择首页
-  - 多人会议 / 1v1 通话 / 推流 / 拉流 四种业务卡片入口
+### 首页与通用
 
-- 多人会议
-  - 多人同时入会，房间隔离
-  - 音视频实时发布与订阅
-  - 麦克风 / 摄像头开关（对端实时感知）
-  - 屏幕共享（基于 `getDisplayMedia`）
-  - 房间内文字聊天
-  - 自己摄像头流 / 屏幕共享流可一键录制（MP4）
+- 业务选择首页 + 弹窗表单（昵称/房间号/流名按业务显隐）
+- 昵称、房间号写入 `sessionStorage`，下次自动填充
+- 深链 `?biz=xxx` 直接打开对应业务表单
 
-- 1v1 通话
-  - 两人专属房间，后端强制最多 2 人
-  - 大画面 + 自视图小窗布局
-  - 同样支持录制
+### 多人会议 / 1v1 通话
 
-- 独立推流
-  - 输入「房间号 + 流名」后将本机摄像头推到 ZLM（`mode=solo`，房间号映射为 ZLM `app`）
-  - 录制按钮触发后端调用 ZLM 录制
+- 多人（或两人）同时入会，房间隔离
+- 音视频实时发布与订阅（推流完成后自动通知对端拉流）
+- 麦克风 / 摄像头开关（对端实时感知）
+- 画质切换：流畅（426×240）、标清（640×480）、高清（1280×720），热切换 `replaceTrack`
+- 屏幕共享（基于 `getDisplayMedia`）
+- 房间内文字聊天（`solo` 模式不广播）
+- 摄像头流 / 屏幕共享流分别可录制（MP4）
+- 停止录制后弹出预览浮层，支持在线播放与下载
 
-- 独立拉流
-  - 输入「房间号 + 流名」从 ZLM 拉流播放（房间号需与推流端一致）
+### 独立推流 / 拉流
 
-- 信令（WebSocket，JSON）
-  - 统一 envelope：`{ "type", "reqId", "payload" }`
-  - 支持 request/response 模式（`reqId` 回调）
-  - 所有与 ZLM 的交互（SDP 交换、录制、close）都经信令服务端中转
+- 推流：输入「房间号 + 流名」后将本机摄像头推到 ZLM
+- 拉流：输入相同房间号与流名即可播放
+- 推流页同样支持画质切换与 MP4 录制、预览、下载
 
-- 媒体（WebRTC via ZLMediaKit）
-  - WebRTC 推流（publish）与拉流（play）
-  - 基于 ZLM REST API 的 SDP 交换代理
-  - 录制由后端调用 `/index/api/startRecord` / `stopRecord`（MP4）
-  - 离会自动停止录制并关闭关联流（`close_streams`）
+### 信令（WebSocket，JSON）
+
+- 统一 envelope：`{ "type", "reqId", "payload" }`
+- 支持 request/response 模式（`reqId` 回调，用于 SDP 交换与录制控制）
+- 所有与 ZLM 的交互（SDP 交换、录制、close）都经信令服务端中转
+
+### 媒体（WebRTC via ZLMediaKit）
+
+- WebRTC 推流（publish）与拉流（play）
+- 基于 ZLM REST API 的 SDP 交换代理
+- 录制由后端调用 `/index/api/startRecord` / `stopRecord`（MP4）
+- 停止录制后通过 Hook 缓存或 API 轮询解析文件 URL，经 `/api/record-file` 同源代理预览/下载
+- 离会自动停止录制并关闭关联流（`close_streams`）
+
+### HTTP 辅助接口
+
+| 路径 | 说明 |
+|------|------|
+| `/ws` | WebSocket 信令 |
+| `/healthz` | 健康检查，返回 `ok` |
+| `/api/zlm-hook/record-mp4` | 接收 ZLM 录制完成 Hook |
+| `/api/record-file?url=...&mode=preview\|download` | 同源代理 ZLM 录制文件（支持 Range） |
+| `/` | 静态前端（`static_dir` 配置时） |
 
 ## 快速开始
 
@@ -74,10 +105,29 @@
 
 ```ini
 [api]
-secret=
+secret=your_secret
 
 [http]
-port=
+port=8081
+```
+
+额外配置录制完成 Hook，使停止录制后预览即时可用（无需等待 API 轮询）：
+
+```ini
+[hook]
+on_record_mp4 = https://<信令服务地址>:8080/api/zlm-hook/record-mp4
+```
+
+> 若信令服务启用了 TLS（`tls_cert` / `tls_key`），Hook 地址**必须**使用 `https://`，否则 ZLM 会收到 400。自签证书仅会在 ZLM 日志中打印警告，不影响 Hook 功能。
+
+额外配置启用ZLMediakit的RTSP媒体流解复用功能，降低画面首开延时：
+
+```ini
+[protocol]
+enable_rtsp=1
+
+[rtsp]
+directProxy=0
 ```
 
 ### 2. 编译后端
@@ -96,17 +146,22 @@ bash backend/scripts/build.sh
 - 执行 `go mod tidy` 拉取依赖
 - 编译，输出到 `backend/bin/zlm_meet`
 
-编译完成后，**编辑配置文件**，修改：
+编译完成后，**编辑配置文件**：
 
 ```bash
 vi backend/bin/conf/config.yaml
 ```
 
-- `zlm.api_base`：zlm 服务的 HTTP API 地址，例如：`http://zlm_ip:zlm_port`
-- `zlm.secret`：zlm 服务的密钥
-- `tls_cert`：TLS 证书文件路径，包含证书文件名
-- `tls_key`：TLS 密钥文件路径，包含密钥文件名
-- `static_dir`：前端资源文件根目录路径
+主要配置项：
+
+| 配置项 | 说明 |
+|--------|------|
+| `listen` | 信令服务监听地址，默认 `:8080` |
+| `tls_cert` / `tls_key` | TLS 证书；留空则以 HTTP 监听 |
+| `static_dir` | 前端静态资源目录（相对 `bin/` 运行目录） |
+| `allowed_origins` | WebSocket Origin 白名单；留空则不校验（开发用） |
+| `zlm.api_base` | ZLM HTTP API 地址，如 `http://192.168.1.10:8081` |
+| `zlm.secret` | ZLM `config.ini` 中的 `[api] secret` |
 
 > 注：ZLM 流路径里的 `app` 字段由前端「房间号」决定，不在配置文件中。同房间内所有人共用同一个 ZLM `app`，互相可见。
 
@@ -116,13 +171,14 @@ vi backend/bin/conf/config.yaml
 bash backend/scripts/start.sh
 ```
 
-脚本会切换到 `backend/bin/` 目录后启动服务，确保 `static_dir` 和证书等相对路径正确解析。默认监听 `:8080`，打开 `https://信令服务ip地址:信令服务端口/` 即可看到加入页。
+脚本会切换到 `backend/bin/` 目录后启动服务，确保 `static_dir` 和证书等相对路径正确解析。默认监听 `:8080`，打开 `https://信令服务ip:端口/` 即可看到业务选择页。
 
 ### 4. 局域网多设备访问（HTTPS）
 
 浏览器仅在 `https://` 或 `http://localhost` 下允许获取摄像头。局域网其他设备访问时需要 TLS，用 OpenSSL 生成自签证书，直接输出到 `backend/bin/cert/`：
 
 ```bash
+cd backend/bin/cert
 openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes
 ```
 
@@ -133,49 +189,51 @@ tls_cert: "cert/cert.pem"
 tls_key:  "cert/key.pem"
 ```
 
-证书放好后直接重启服务即可，访问 `https://信令服务ip地址:信令服务端口/`，浏览器提示证书不受信任时点击"高级 → 继续访问"。
+证书放好后直接重启服务即可。访问 `https://信令服务ip:端口/`，浏览器提示证书不受信任时点击「高级 → 继续访问」。
 
 ## 项目结构
 
 ```
 zlm_meet/
 ├── backend/
+│   ├── conf/
+│   │   └── config-example.yaml # 配置模板
 │   ├── scripts/
-│   │   ├── build.sh              # 初始化目录、编译
-│   │   └── start.sh              # 启动服务
-│   ├── bin/                      # 编译产出（由 build.sh 生成）
-│   │   ├── zlm_meet              # 可执行程序
+│   │   ├── build.sh            # 初始化目录、编译
+│   │   └── start.sh            # 启动服务
+│   ├── bin/                    # 编译产出（由 build.sh 生成）
+│   │   ├── zlm_meet            # 可执行程序
 │   │   ├── conf/
-│   │   │   └── config.yaml       # 运行时配置
-│   │   └── cert/                 # TLS 证书目录
+│   │   │   └── config.yaml     # 运行时配置
+│   │   └── cert/               # TLS 证书目录
 │   └── src/
-│       ├── config-example.yaml   # 配置模板
 │       ├── go.mod / go.sum
 │       ├── cmd/
-│       │   └── main.go           # 入口：加载配置、启动 HTTP/WS、优雅退出
+│       │   └── main.go         # 入口：加载配置、启动 HTTP/WS、优雅退出
 │       └── pkg/
 │           ├── config/config.go  # YAML 配置解析
-│           ├── server/server.go  # 路由 + WS upgrader + 静态文件
+│           ├── server/server.go  # 路由 + WS + Hook + 录制代理 + 静态文件
 │           ├── signaling/
 │           │   ├── message.go    # 信令消息结构 + 类型常量
 │           │   ├── hub.go        # 全局房间表
-│           │   ├── room.go       # 房间 + 广播
+│           │   ├── room.go       # 房间 + 广播 + 人数限制
 │           │   └── client.go     # 单连接读写循环 + 消息处理
-│           └── zlm/client.go     # ZLM REST API 封装（SDP 交换 / close_streams）
+│           └── zlm/client.go     # ZLM REST API + Hook 缓存 + 录制 URL 解析
 └── frontend/
-    ├── index.html                # 业务选择 + 加入表单
-    ├── meeting.html              # 多人会议页
-    ├── call.html                 # 1v1 通话页（与 meeting 共用 app.js）
-    ├── push.html                 # 独立推流页
-    ├── play.html                 # 独立拉流页
+    ├── index.html              # 业务选择 + 加入表单
+    ├── meeting.html            # 多人会议页
+    ├── call.html               # 1v1 通话页（与 meeting 共用 app.js）
+    ├── push.html               # 独立推流页
+    ├── play.html               # 独立拉流页
     ├── css/style.css
     └── js/
-        ├── signaling.js          # WS 客户端（含 request/response）
-        ├── webrtc.js             # publishStream / playStream（含 ICE 等待优化）
-        ├── ui.js                 # 视频网格 + 聊天面板 DOM 操作
-        ├── app.js                # 会议/通话主流程（采集与信令并行启动）
-        ├── push.js               # 独立推流主流程
-        └── play.js               # 独立拉流主流程
+        ├── signaling.js        # WS 客户端（含 request/response）
+        ├── webrtc.js           # publishStream / playStream（含 ICE 等待优化）
+        ├── ui.js               # 视频网格 + 聊天面板 DOM 操作
+        ├── quality.js          # 画质档位与热切换 UI
+        ├── app.js              # 会议/通话主流程
+        ├── push.js             # 独立推流主流程
+        └── play.js             # 独立拉流主流程
 ```
 
 ## 信令协议
@@ -186,18 +244,18 @@ zlm_meet/
 { "type": "...", "reqId": "可选", "payload": { ... } }
 ```
 
-`reqId` 用于客户端期望响应的请求（目前仅 `webrtc-offer`）。
+`reqId` 用于客户端期望响应的请求（`webrtc-offer`、`record-start`、`record-stop`）。
 
 ### 客户端 → 服务端
 
 | type             | payload                                                                          | 说明                                                         |
 |------------------|----------------------------------------------------------------------------------|--------------------------------------------------------------|
-| `join`           | `{room, nickname, mode?}`                                                        | 加入房间，`room` 映射为 ZLM `app`；`mode`=`meeting`(默认) / `call`(1v1, 容量 2) / `solo`(独立推/拉流，容量不限) |
+| `join`           | `{room, nickname, mode?}`                                                        | 加入房间，`room` 映射为 ZLM `app`；`mode`=`meeting`(默认) / `call`(1v1, 容量 2) / `solo`(独立推/拉流) |
 | `leave`          | `{}`                                                                             | 主动离开（也可直接断开 WS）                                  |
 | `chat`           | `{text}`                                                                         | 向房间内广播文本（solo 模式不广播）                          |
 | `media-state`    | `{micOn, camOn}`                                                                 | 同步麦克风/摄像头状态给其他人                                |
 | `webrtc-offer`   | `{mode, kind?, targetUserId?, streamId?, sdp}`                                   | SDP 交换；`mode`=`publish`/`play`/`publish-solo`/`play-solo`；solo 模式必须带 `streamId` |
-| `stream-started` | `{kind, streamId}`                                                               | 推流完成后通知房间                                           |
+| `stream-started` | `{kind, streamId}`                                                               | 推流完成后通知房间（服务端在 publish 成功时也会主动广播）    |
 | `stream-stopped` | `{kind, streamId}`                                                               | 停止某条推流（如关闭屏幕共享）                               |
 | `record-start`   | `{kind?, streamId?}`                                                             | 申请录制自己拥有的流；房间场景给 `kind`、solo 给 `streamId`；带 `reqId` 等待 ack |
 | `record-stop`    | `{kind?, streamId?}`                                                             | 同上，停止录制                                               |
@@ -214,7 +272,7 @@ zlm_meet/
 | `peer-stream-started`  | `{userId, kind, streamId}`                                                                |
 | `peer-stream-stopped`  | `{userId, kind, streamId}`                                                                |
 | `chat`                 | `{from, nickname, text, ts}`                                                              |
-| `record-state`         | `{userId?, kind?, streamId, recording}`（ack 与 `reqId` 同；房间内同步给所有人）          |
+| `record-state`         | `{userId?, kind?, streamId, recording, recordFileUrl?}`（停止录制且解析到文件时带 `recordFileUrl`；ack 与 `reqId` 同；房间内同步给所有人） |
 | `error`                | `{message}`                                                                               |
 
 ## 已知限制
@@ -224,6 +282,7 @@ zlm_meet/
 - 无 SFU 编排逻辑，依赖 ZLM 作媒体网关；如需 simulcast/SVC，需扩展 SDP 协商。
 - 屏幕共享依赖 `getDisplayMedia`，部分浏览器（如 Safari）行为存在差异。
 - 房间即 ZLM `app`：不同房间号的用户彼此不可见，同一房间号会复用同一个 ZLM 流分组，注意避免房间号冲突。
+- 未配置 `on_record_mp4` Hook 时，停止录制后需依赖后端轮询 ZLM API 获取文件 URL，预览可能有数秒延迟。
 
 ## 快速排错
 
@@ -234,6 +293,8 @@ zlm_meet/
 | 看不到自己                   | 浏览器是否授予摄像头权限；当前页是否在 `https` 或 `localhost` 下       |
 | 看不到对方                   | ZLM 控制台是否有对应 stream；浏览器控制台是否有 `play` 失败日志        |
 | Chrome 提示 ICE failed       | `webrtc.externIP` 是否填写正确；防火墙是否拦截 UDP                     |
+| 录制完成无预览               | 是否配置 `hook.on_record_mp4`；Hook 地址协议是否与信令服务 TLS 一致   |
+| 预览无法播放                 | `/api/record-file` 代理是否可达；ZLM 录制目录 HTTP 是否可访问         |
 
 ## 授权协议
 
