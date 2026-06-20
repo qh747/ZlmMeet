@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZLM 媒体服务 · 业务选择</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="home-page">
+  <main class="home-wrap">
+    <header class="home-header">
+      <h1>ZLM 媒体服务</h1>
+      <p class="subtitle">选择要使用的业务</p>
+    </header>
+
+    <section class="home-grid">
+      <button class="home-card" data-biz="meeting">
+        <div class="card-icon">👥</div>
+        <div class="card-title">多人会议</div>
+        <div class="card-desc">多人加入同一房间，互相音视频通话</div>
+      </button>
+      <button class="home-card" data-biz="call">
+        <div class="card-icon">📞</div>
+        <div class="card-title">1v1 通话</div>
+        <div class="card-desc">两人专属房间，自动限制最多两人</div>
+      </button>
+      <button class="home-card" data-biz="push">
+        <div class="card-icon">📤</div>
+        <div class="card-title">推流</div>
+        <div class="card-desc">把本机摄像头推送到 ZLM 媒体服务器</div>
+      </button>
+      <button class="home-card" data-biz="play">
+        <div class="card-icon">📥</div>
+        <div class="card-title">拉流</div>
+        <div class="card-desc">输入流名，从 ZLM 拉取并播放</div>
+      </button>
+    </section>
+
+    <dialog id="formDialog" class="home-dialog">
+      <form id="bizForm" autocomplete="off">
+        <h2 id="formTitle">加入</h2>
+        <div class="form-row" data-field="nickname">
+          <label>
+            <span>昵称</span>
+            <input id="nickname" type="text" maxlength="32" placeholder="比如 Alice" />
+          </label>
+        </div>
+        <div class="form-row" data-field="room">
+          <label>
+            <span id="roomLabel">房间号</span>
+            <input id="room" type="text" maxlength="64" placeholder="比如 1001" />
+          </label>
+        </div>
+        <div class="form-row" data-field="stream">
+          <label>
+            <span>流名（仅字母数字、_-.）</span>
+            <input id="streamId" type="text" maxlength="128" placeholder="比如 demo_001" />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="formCancel" class="ghost">取消</button>
+          <button type="submit" class="primary">进入</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+
+  <script>
+    (function () {
+      const dialog = document.getElementById('formDialog');
+      const form = document.getElementById('bizForm');
+      const title = document.getElementById('formTitle');
+      const roomLabel = document.getElementById('roomLabel');
+      const fields = {
+        nickname: form.querySelector('[data-field="nickname"]'),
+        room: form.querySelector('[data-field="room"]'),
+        stream: form.querySelector('[data-field="stream"]'),
+      };
+      const inputs = {
+        nickname: document.getElementById('nickname'),
+        room: document.getElementById('room'),
+        stream: document.getElementById('streamId'),
+      };
+
+      const SAVED_NAME = sessionStorage.getItem('zlm.nickname') || '';
+      if (SAVED_NAME) inputs.nickname.value = SAVED_NAME;
+
+      let currentBiz = null;
+
+      function showFields(map) {
+        for (const key of Object.keys(fields)) {
+          fields[key].style.display = map[key] ? '' : 'none';
+          inputs[key].required = !!map[key];
+        }
+      }
+
+      function openBiz(biz) {
+        currentBiz = biz;
+        switch (biz) {
+          case 'meeting':
+            title.textContent = '加入多人会议';
+            roomLabel.textContent = '房间号';
+            showFields({ nickname: true, room: true, stream: false });
+            inputs.room.placeholder = '比如 1001';
+            break;
+          case 'call':
+            title.textContent = '加入 1v1 通话';
+            roomLabel.textContent = '通话编号';
+            showFields({ nickname: true, room: true, stream: false });
+            inputs.room.placeholder = '比如 alice-bob';
+            break;
+          case 'push':
+            title.textContent = '推流';
+            showFields({ nickname: false, room: false, stream: true });
+            if (!inputs.stream.value) inputs.stream.value = 'pub_' + Date.now();
+            break;
+          case 'play':
+            title.textContent = '拉流';
+            showFields({ nickname: false, room: false, stream: true });
+            break;
+        }
+        if (typeof dialog.showModal === 'function') {
+          dialog.showModal();
+        } else {
+          dialog.setAttribute('open', '');
+        }
+      }
+
+      document.querySelectorAll('.home-card').forEach((btn) => {
+        btn.addEventListener('click', () => openBiz(btn.dataset.biz));
+      });
+      document.getElementById('formCancel').addEventListener('click', () => {
+        dialog.close();
+      });
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const nickname = inputs.nickname.value.trim();
+        const room = inputs.room.value.trim();
+        const stream = inputs.stream.value.trim();
+
+        if (currentBiz === 'meeting' || currentBiz === 'call') {
+          if (!nickname || !room) return;
+          sessionStorage.setItem('zlm.nickname', nickname);
+          sessionStorage.setItem('zlm.room', room);
+          location.href = currentBiz === 'meeting' ? 'meeting.html' : 'call.html';
+        } else if (currentBiz === 'push') {
+          if (!isSafeStream(stream)) {
+            alert('流名只能包含字母、数字、下划线、连字符或点');
+            return;
+          }
+          sessionStorage.setItem('zlm.streamId', stream);
+          location.href = 'push.html';
+        } else if (currentBiz === 'play') {
+          if (!isSafeStream(stream)) {
+            alert('流名只能包含字母、数字、下划线、连字符或点');
+            return;
+          }
+          sessionStorage.setItem('zlm.streamId', stream);
+          location.href = 'play.html';
+        }
+      });
+
+      function isSafeStream(s) {
+        return /^[A-Za-z0-9_.\-]{1,128}$/.test(s);
+      }
+
+      // Allow ?biz=xxx deep-link.
+      const params = new URLSearchParams(location.search);
+      const biz = params.get('biz');
+      if (biz && ['meeting', 'call', 'push', 'play'].includes(biz)) {
+        openBiz(biz);
+      }
+    })();
+  </script>
+</body>
+</html>

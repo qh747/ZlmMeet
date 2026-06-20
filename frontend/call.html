@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1v1 通话</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="meeting-page" data-mode="call">
+  <header class="topbar">
+    <div class="room-label">通话编号：<span id="roomName">-</span></div>
+    <div class="me-label">我：<span id="myName">-</span></div>
+  </header>
+
+  <main class="stage">
+    <section id="videoGrid" class="video-grid">
+      <!-- Tiles appended dynamically -->
+    </section>
+
+    <aside id="chatPanel" class="chat-panel hidden">
+      <div class="chat-header">
+        <span>聊天</span>
+        <button id="chatClose" class="icon-btn" title="关闭">×</button>
+      </div>
+      <div id="chatLog" class="chat-log"></div>
+      <form id="chatForm" class="chat-form">
+        <input id="chatInput" type="text" placeholder="说点什么…" maxlength="500" autocomplete="off" />
+        <button type="submit" class="primary">发送</button>
+      </form>
+    </aside>
+  </main>
+
+  <footer class="toolbar">
+    <button id="btnMic" class="toolbar-btn" title="麦克风">🎤<span class="label">麦克风</span></button>
+    <button id="btnCam" class="toolbar-btn" title="摄像头">📹<span class="label">摄像头</span></button>
+    <button id="btnRecord" class="toolbar-btn" title="录制">⏺️<span class="label">录制</span></button>
+    <button id="btnChat" class="toolbar-btn" title="聊天">💬<span class="label">聊天</span></button>
+    <button id="btnLeave" class="toolbar-btn danger" title="挂断">⛔<span class="label">挂断</span></button>
+  </footer>
+
+  <div id="statusBar" class="status-bar hidden"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

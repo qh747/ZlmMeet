@@ -1,0 +1,24 @@
+# 信令服务监听
+listen: ":8080"
+
+# 可选 TLS（局域网多设备测试访问摄像头需要 HTTPS/WSS）
+# 留空则以 HTTP 监听；填写后以 HTTPS 监听。
+tls_cert: "cert.pem"
+tls_key: "key.pem"
+
+# 前端静态文件目录（相对于可执行文件运行目录），留空则不托管静态文件
+static_dir: "../frontend"
+
+# 允许的 WebSocket Origin，留空表示不校验（开发用）
+allowed_origins: []
+
+# ZLMediaKit 配置
+zlm:
+  # ZLM HTTP API 基地址（带 http:// 前缀，不带末尾 /）
+  api_base: "http://192.168.31.76:8081"
+  # ZLM 配置中的 general.secret
+  secret: "IqZLFoY9Kbzr2JjkRT3LSDxwzicnvetN"
+  # 应用名（流地址中的 app 字段），所有会议流都放在该 app 下
+  app: "meeting"
+  # 默认 vhost
+  vhost: "__defaultVhost__"

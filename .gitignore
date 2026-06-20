@@ -1,0 +1,116 @@
+# ============================================
+# Go
+# ============================================
+# 编译输出
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+backend/backend
+backend/zlm_meet
+
+# 测试二进制
+*.test
+
+# 覆盖率
+*.out
+coverage.html
+coverage.txt
+
+# 依赖 vendor
+vendor/
+
+# Go workspace
+go.work
+go.work.sum
+
+# ============================================
+# IDE / Editor
+# ============================================
+# VSCode / Cursor
+.vscode/
+.cursor/
+
+# JetBrains
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.*.swp
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ============================================
+# OS
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+
+# ============================================
+# 环境 & 配置
+# ============================================
+.env
+.env.local
+.env.*.local
+
+# TLS 证书（如项目使用自签名证书）
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# ============================================
+# 日志 & 临时文件
+# ============================================
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+logs/
+
+# ============================================
+# ZLMediaKit 相关
+# ============================================
+# ZLM 配置文件副本
+zlm*.ini.bak
+
+# ============================================
+# 其他
+# ============================================
+# 调试输出
+__debug_bin*
+debug
+
+# 打包产物
+*.zip
+*.tar.gz
+*.tgz
+dist/
+build/
+bin/

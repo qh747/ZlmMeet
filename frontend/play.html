@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>拉流 · ZLM</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="solo-page">
+  <header class="topbar">
+    <div class="room-label">拉流：<span id="streamLabel">-</span></div>
+    <div class="me-label">状态：<span id="streamState">未开始</span></div>
+  </header>
+
+  <main class="solo-stage">
+    <div class="solo-tile">
+      <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+
+    <section class="solo-info">
+      <div><strong>流名：</strong><span id="streamNameInfo">-</span></div>
+      <div class="hint">点击「开始拉流」从 ZLM 拉取并播放。请确保对应的流当前正在推送。</div>
+    </section>
+  </main>
+
+  <footer class="toolbar">
+    <button id="btnStart" class="toolbar-btn active" title="开始/停止拉流">▶️<span class="label">开始拉流</span></button>
+    <button id="btnLeave" class="toolbar-btn danger" title="返回首页">⛔<span class="label">退出</span></button>
+  </footer>
+
+  <div id="statusBar" class="status-bar hidden"></div>
+
+  <script type="module" src="js/play.js"></script>
+</body>
+</html>

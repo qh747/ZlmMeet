@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>推流 · ZLM</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="solo-page">
+  <header class="topbar">
+    <div class="room-label">推流：<span id="streamLabel">-</span></div>
+    <div class="me-label">状态：<span id="streamState">未开始</span></div>
+  </header>
+
+  <main class="solo-stage">
+    <div class="solo-tile" id="soloTile">
+      <video id="localVideo" autoplay playsinline muted></video>
+      <div class="rec-indicator hidden" id="recIndicator"><span class="rec-dot"></span>REC</div>
+    </div>
+
+    <section class="solo-info">
+      <div><strong>App：</strong><span id="appName">meeting</span></div>
+      <div><strong>流名：</strong><span id="streamNameInfo">-</span></div>
+      <div class="hint">其他客户端可在「拉流」页面输入同样的流名进行观看。</div>
+    </section>
+  </main>
+
+  <footer class="toolbar">
+    <button id="btnMic" class="toolbar-btn" title="麦克风">🎤<span class="label">麦克风</span></button>
+    <button id="btnCam" class="toolbar-btn" title="摄像头">📹<span class="label">摄像头</span></button>
+    <button id="btnStart" class="toolbar-btn active" title="开始/停止推流">▶️<span class="label">开始推流</span></button>
+    <button id="btnRecord" class="toolbar-btn" title="录制">⏺️<span class="label">录制</span></button>
+    <button id="btnLeave" class="toolbar-btn danger" title="返回首页">⛔<span class="label">退出</span></button>
+  </footer>
+
+  <div id="statusBar" class="status-bar hidden"></div>
+
+  <script type="module" src="js/push.js"></script>
+</body>
+</html>
