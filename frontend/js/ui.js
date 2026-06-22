@@ -2,6 +2,11 @@
 
 const MEETING_COLS = 3;
 const MEETING_ASPECT = 16 / 9;
+const FOCUS_GAP = 6;
+const FOCUS_THUMB_GAP = 4;
+const FOCUS_INSET_X = 16;
+const FOCUS_INSET_Y = 10;
+const FOCUS_MAX_THUMB_W = 192;
 
 export class MeetingUI {
   constructor() {
@@ -156,6 +161,8 @@ export class MeetingUI {
       entry.tile.style.gridRow = '';
       entry.tile.style.width = '';
       entry.tile.style.height = '';
+      entry.tile.style.justifySelf = '';
+      entry.tile.style.alignSelf = '';
     }
 
     this.grid.classList.toggle('focus-mode', !!this.focusedKey && count > 1);
@@ -163,6 +170,13 @@ export class MeetingUI {
     this.grid.style.gridTemplateRows = '';
     this.grid.style.justifyContent = '';
     this.grid.style.alignContent = '';
+    this.grid.style.width = '';
+    this.grid.style.height = '';
+    this.grid.style.gap = '';
+    this.grid.style.rowGap = '';
+    this.grid.style.columnGap = '';
+    this.grid.style.margin = '';
+    this.grid.style.padding = '';
 
     if (count === 0) return;
 
@@ -193,44 +207,87 @@ export class MeetingUI {
   _applyFocusLayout(keys) {
     const sidebarKeys = keys.filter((k) => k !== this.focusedKey);
     const sidebarCount = sidebarKeys.length;
-    const { gridW, gridH, gap } = this._gridInnerMetrics();
+    const { gridW, gridH } = this._gridInnerMetrics();
+    const innerW = Math.max(0, gridW - FOCUS_INSET_X * 2);
+    const innerH = Math.max(0, gridH - FOCUS_INSET_Y * 2);
 
-    let sidebarW = 0;
-    let sidebarH = 0;
-    if (sidebarCount > 0) {
-      const maxSidebarW = Math.min(180, gridW * 0.24);
-      const maxSidebarH = (gridH - gap * (sidebarCount - 1)) / sidebarCount;
-      ({ w: sidebarW, h: sidebarH } = this._fitAspectSize(maxSidebarW, maxSidebarH));
+    if (sidebarCount === 0) {
+      this._applyFocusMainOnly(innerW, innerH);
+      this.grid.style.margin = `${FOCUS_INSET_Y}px ${FOCUS_INSET_X}px`;
+      return;
     }
 
-    const blockH = sidebarCount > 0
-      ? sidebarCount * sidebarH + gap * (sidebarCount - 1)
-      : gridH;
+    const layout = this._computeFocusLayout(sidebarCount, innerW, innerH);
 
-    this.grid.style.justifyContent = 'center';
-    this.grid.style.alignContent = 'center';
-    this.grid.style.gridTemplateColumns = sidebarCount > 0
-      ? `minmax(0, 1fr) ${sidebarW}px`
-      : 'minmax(0, 1fr)';
-    this.grid.style.gridTemplateRows = sidebarCount > 0
-      ? `repeat(${sidebarCount}, ${sidebarH}px)`
-      : `${blockH}px`;
+    const rowTracks = [
+      ...Array(sidebarCount).fill(`${layout.thumbH}px`),
+      'minmax(0, 1fr)',
+    ].join(' ');
+    const totalRows = sidebarCount + 1;
+
+    this.grid.style.rowGap = `${FOCUS_THUMB_GAP}px`;
+    this.grid.style.columnGap = `${FOCUS_GAP}px`;
+    this.grid.style.width = `${innerW}px`;
+    this.grid.style.height = `${innerH}px`;
+    this.grid.style.margin = `${FOCUS_INSET_Y}px ${FOCUS_INSET_X}px`;
+    this.grid.style.justifyContent = 'start';
+    this.grid.style.alignContent = 'start';
+    this.grid.style.gridTemplateColumns = `${layout.mainW}px ${layout.sidebarW}px`;
+    this.grid.style.gridTemplateRows = rowTracks;
 
     const mainEntry = this.tiles.get(this.focusedKey);
     mainEntry.tile.classList.add('is-focused');
     mainEntry.tile.style.gridColumn = '1';
-    mainEntry.tile.style.gridRow = sidebarCount > 0 ? `1 / span ${sidebarCount}` : '1';
-    mainEntry.tile.style.width = '';
-    mainEntry.tile.style.height = '';
+    mainEntry.tile.style.gridRow = `1 / span ${totalRows}`;
+    mainEntry.tile.style.width = '100%';
+    mainEntry.tile.style.height = '100%';
 
     sidebarKeys.forEach((key, index) => {
       const entry = this.tiles.get(key);
       entry.tile.classList.add('is-sidebar');
       entry.tile.style.gridColumn = '2';
       entry.tile.style.gridRow = String(index + 1);
-      entry.tile.style.width = `${sidebarW}px`;
-      entry.tile.style.height = `${sidebarH}px`;
+      entry.tile.style.width = `${layout.thumbW}px`;
+      entry.tile.style.height = `${layout.thumbH}px`;
+      entry.tile.style.justifySelf = 'start';
+      entry.tile.style.alignSelf = 'start';
     });
+  }
+
+  _applyFocusMainOnly(innerW, innerH) {
+    this.grid.style.gap = '0';
+    this.grid.style.width = `${innerW}px`;
+    this.grid.style.height = `${innerH}px`;
+    this.grid.style.justifyContent = 'center';
+    this.grid.style.alignContent = 'center';
+    this.grid.style.gridTemplateColumns = `${innerW}px`;
+    this.grid.style.gridTemplateRows = `${innerH}px`;
+
+    const mainEntry = this.tiles.get(this.focusedKey);
+    mainEntry.tile.classList.add('is-focused');
+    mainEntry.tile.style.gridColumn = '1';
+    mainEntry.tile.style.gridRow = '1';
+    mainEntry.tile.style.width = '100%';
+    mainEntry.tile.style.height = '100%';
+  }
+
+  /** Sidebar thumbs 16:9, stacked at top; bottom row absorbs remaining height. */
+  _computeFocusLayout(sidebarCount, innerW, innerH) {
+    let thumbW = FOCUS_MAX_THUMB_W;
+    let thumbH = Math.floor(thumbW / MEETING_ASPECT);
+
+    const maxStackH = innerH * 0.52;
+    const stackH = sidebarCount * thumbH + (sidebarCount - 1) * FOCUS_THUMB_GAP;
+    if (stackH > maxStackH) {
+      thumbH = Math.floor((maxStackH - (sidebarCount - 1) * FOCUS_THUMB_GAP) / sidebarCount);
+      thumbW = Math.floor(thumbH * MEETING_ASPECT);
+    }
+
+    thumbW = Math.max(112, thumbW);
+    thumbH = Math.max(63, thumbH);
+    const sidebarW = thumbW;
+    const mainW = Math.max(0, innerW - FOCUS_GAP - sidebarW);
+    return { mainW, sidebarW, thumbW, thumbH };
   }
 
   _gridInnerMetrics() {
@@ -245,12 +302,12 @@ export class MeetingUI {
     };
   }
 
-  _fitAspectSize(maxW, maxH) {
+  _fitAspectSize(maxW, maxH, aspect = MEETING_ASPECT) {
     let w = maxW;
-    let h = w / MEETING_ASPECT;
+    let h = w / aspect;
     if (h > maxH) {
       h = maxH;
-      w = h * MEETING_ASPECT;
+      w = h * aspect;
     }
     return { w: Math.floor(w), h: Math.floor(h) };
   }

@@ -8,33 +8,52 @@
 </head>
 <body class="home-page">
   <main class="home-wrap">
-    <header class="home-header">
-      <h1>ZLM 会议</h1>
-      <p class="subtitle">选择要使用的业务</p>
-    </header>
+    <div class="home-shell">
+      <header class="home-header">
+        <p class="home-eyebrow">ZLMediaKit · WebRTC</p>
+        <h1>ZLM 会议</h1>
+        <p class="subtitle">选择业务场景，开始实时音视频</p>
+      </header>
 
-    <section class="home-grid">
-      <button class="home-card" data-biz="meeting">
-        <div class="card-icon">👥</div>
-        <div class="card-title">多人会议</div>
-        <div class="card-desc">多人加入同一房间，互相音视频通话</div>
-      </button>
-      <button class="home-card" data-biz="call">
-        <div class="card-icon">📞</div>
-        <div class="card-title">1v1 通话</div>
-        <div class="card-desc">两人专属房间，自动限制最多两人</div>
-      </button>
-      <button class="home-card" data-biz="push">
-        <div class="card-icon">📤</div>
-        <div class="card-title">推流</div>
-        <div class="card-desc">把本机摄像头推送到 ZLM 媒体服务器</div>
-      </button>
-      <button class="home-card" data-biz="play">
-        <div class="card-icon">📥</div>
-        <div class="card-title">拉流</div>
-        <div class="card-desc">输入房间号与流名，从 ZLM 拉取并播放</div>
-      </button>
-    </section>
+      <section class="home-grid">
+        <button class="home-card" data-biz="meeting">
+          <span class="card-tag">01</span>
+          <div class="card-icon" aria-hidden="true">👥</div>
+          <div class="card-body">
+            <div class="card-title">多人会议</div>
+            <div class="card-desc">多人加入同一房间，互相音视频通话</div>
+          </div>
+          <span class="card-arrow" aria-hidden="true">→</span>
+        </button>
+        <button class="home-card" data-biz="call">
+          <span class="card-tag">02</span>
+          <div class="card-icon" aria-hidden="true">📞</div>
+          <div class="card-body">
+            <div class="card-title">1v1 通话</div>
+            <div class="card-desc">两人专属房间，自动限制最多两人</div>
+          </div>
+          <span class="card-arrow" aria-hidden="true">→</span>
+        </button>
+        <button class="home-card" data-biz="push">
+          <span class="card-tag">03</span>
+          <div class="card-icon" aria-hidden="true">📤</div>
+          <div class="card-body">
+            <div class="card-title">推流</div>
+            <div class="card-desc">把本机摄像头推送到 ZLM 媒体服务器</div>
+          </div>
+          <span class="card-arrow" aria-hidden="true">→</span>
+        </button>
+        <button class="home-card" data-biz="play">
+          <span class="card-tag">04</span>
+          <div class="card-icon" aria-hidden="true">📥</div>
+          <div class="card-body">
+            <div class="card-title">拉流</div>
+            <div class="card-desc">输入房间号与流名，从 ZLM 拉取并播放</div>
+          </div>
+          <span class="card-arrow" aria-hidden="true">→</span>
+        </button>
+      </section>
+    </div>
 
     <dialog id="formDialog" class="home-dialog">
       <form id="bizForm" autocomplete="off">
