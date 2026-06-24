@@ -892,7 +892,19 @@ input { font-family: inherit; }
   box-shadow: var(--shadow-lg);
   z-index: 2;
   aspect-ratio: 16 / 9;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   transition: box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.call-layout .video-grid .video-tile.is-pip.is-pip-custom {
+  inset: auto;
+}
+.call-layout .video-grid .video-tile.is-pip.is-pip-dragging {
+  cursor: grabbing;
+  transition: none;
+  box-shadow: var(--shadow-lg), 0 0 0 2px var(--accent-glow);
+  z-index: 3;
 }
 .call-layout .video-grid .video-tile.is-pip:hover,
 .call-layout .video-grid .video-tile:not(.is-pip):hover {

@@ -28,6 +28,9 @@ export class MeetingUI {
     this.isMeetingLayout = document.body.dataset.mode === 'meeting';
     this.isCallLayout = document.body.dataset.mode === 'call';
     this.callPipKey = 'self';
+    this.pipPosition = null;
+    this._pipDrag = null;
+    this._suppressPipClickUntil = 0;
 
     if (this.isMeetingLayout && this.grid) {
       this.grid.classList.add('meeting-grid');
@@ -36,6 +39,19 @@ export class MeetingUI {
       if (typeof ResizeObserver !== 'undefined') {
         this._resizeObserver = new ResizeObserver(this._onResize);
         this._resizeObserver.observe(this.grid);
+      }
+    }
+    if (this.isCallLayout && this.grid) {
+      this._onCallResize = () => {
+        if (this.pipPosition) {
+          this._clampPipPosition();
+          this._applyPipPosition(this._getPipTile());
+        }
+      };
+      window.addEventListener('resize', this._onCallResize);
+      if (typeof ResizeObserver !== 'undefined') {
+        this._callResizeObserver = new ResizeObserver(this._onCallResize);
+        this._callResizeObserver.observe(this.grid);
       }
     }
   }
@@ -84,9 +100,14 @@ export class MeetingUI {
       }
       if (this.isCallLayout) {
         tile.addEventListener('dblclick', (e) => {
+          if (Date.now() < this._suppressPipClickUntil) {
+            e.preventDefault();
+            return;
+          }
           e.preventDefault();
           this.toggleCallPip(key);
         });
+        this._bindPipDrag(tile);
       }
 
       this.grid.appendChild(tile);
@@ -142,10 +163,115 @@ export class MeetingUI {
     if (!camKeys.includes(this.callPipKey)) {
       this.callPipKey = camKeys.includes('self') ? 'self' : (camKeys[0] || 'self');
     }
+    for (const [, entry] of this.tiles) {
+      entry.tile.classList.remove('is-pip', 'is-pip-custom', 'is-pip-dragging');
+      entry.tile.style.left = '';
+      entry.tile.style.top = '';
+      entry.tile.style.right = '';
+      entry.tile.style.bottom = '';
+    }
     for (const [key, entry] of this.tiles) {
       const isCam = camKeys.includes(key);
-      entry.tile.classList.toggle('is-pip', isCam && key === this.callPipKey);
+      if (isCam && key === this.callPipKey) {
+        entry.tile.classList.add('is-pip');
+        this._applyPipPosition(entry.tile);
+      }
     }
+  }
+
+  _getPipTile() {
+    for (const [, entry] of this.tiles) {
+      if (entry.tile.classList.contains('is-pip')) return entry.tile;
+    }
+    return null;
+  }
+
+  _bindPipDrag(tile) {
+    if (tile.dataset.pipDragBound) return;
+    tile.dataset.pipDragBound = '1';
+    tile.addEventListener('pointerdown', (e) => this._onPipPointerDown(e, tile));
+    tile.addEventListener('pointermove', this._onPipPointerMove);
+    tile.addEventListener('pointerup', this._onPipPointerUp);
+    tile.addEventListener('pointercancel', this._onPipPointerUp);
+  }
+
+  _onPipPointerDown(e, tile) {
+    if (!tile.classList.contains('is-pip') || e.button !== 0) return;
+    const gridRect = this.grid.getBoundingClientRect();
+    if (!this.pipPosition) {
+      const rect = tile.getBoundingClientRect();
+      this.pipPosition = {
+        left: rect.left - gridRect.left,
+        top: rect.top - gridRect.top,
+      };
+      this._applyPipPosition(tile);
+    }
+    this._pipDrag = {
+      tile,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      origLeft: this.pipPosition.left,
+      origTop: this.pipPosition.top,
+      moved: false,
+    };
+    tile.setPointerCapture(e.pointerId);
+  }
+
+  _onPipPointerMove = (e) => {
+    if (!this._pipDrag || e.pointerId !== this._pipDrag.pointerId) return;
+    const dx = e.clientX - this._pipDrag.startX;
+    const dy = e.clientY - this._pipDrag.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) this._pipDrag.moved = true;
+    this.pipPosition = {
+      left: this._pipDrag.origLeft + dx,
+      top: this._pipDrag.origTop + dy,
+    };
+    this._clampPipPosition();
+    this._applyPipPosition(this._pipDrag.tile);
+    if (this._pipDrag.moved) {
+      this._pipDrag.tile.classList.add('is-pip-dragging');
+    }
+  };
+
+  _onPipPointerUp = (e) => {
+    if (!this._pipDrag || e.pointerId !== this._pipDrag.pointerId) return;
+    const { tile, moved } = this._pipDrag;
+    tile.classList.remove('is-pip-dragging');
+    try { tile.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (moved) this._suppressPipClickUntil = Date.now() + 350;
+    this._pipDrag = null;
+  };
+
+  _applyPipPosition(tile) {
+    if (!tile) return;
+    if (!this.pipPosition) {
+      tile.classList.remove('is-pip-custom');
+      tile.style.left = '';
+      tile.style.top = '';
+      tile.style.right = '';
+      tile.style.bottom = '';
+      return;
+    }
+    tile.classList.add('is-pip-custom');
+    tile.style.right = 'auto';
+    tile.style.bottom = 'auto';
+    tile.style.left = `${this.pipPosition.left}px`;
+    tile.style.top = `${this.pipPosition.top}px`;
+  }
+
+  _clampPipPosition() {
+    if (!this.pipPosition || !this.grid) return;
+    const tile = this._getPipTile();
+    if (!tile) return;
+    const margin = 8;
+    const toolbarReserve = 72;
+    const gridW = this.grid.clientWidth;
+    const gridH = this.grid.clientHeight;
+    const tileW = tile.offsetWidth || 360;
+    const tileH = tile.offsetHeight || 203;
+    this.pipPosition.left = Math.max(margin, Math.min(this.pipPosition.left, gridW - tileW - margin));
+    this.pipPosition.top = Math.max(margin, Math.min(this.pipPosition.top, gridH - tileH - toolbarReserve));
   }
 
   toggleTileFocus(key) {
