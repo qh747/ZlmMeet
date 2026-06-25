@@ -74,4 +74,16 @@
     <div class="quality-options">
       <button type="button" class="quality-option" data-quality="smooth">流畅<span class="quality-desc">426×240</span></button>
       <button type="button" class="quality-option" data-quality="standard">标清<span class="quality-desc">640×480</span></button>
-      <button type="button" class="quality-option" data-quality="hd">高�
+      <button type="button" class="quality-option" data-quality="hd">高清<span class="quality-desc">1280×720</span></button>
+    </div>
+    <button type="button" id="qualityClose" class="ghost">关闭</button>
+  </dialog>
+  <dialog id="qualityFailDialog" class="quality-dialog quality-fail">
+    <h2>设置失败</h2>
+    <p id="qualityFailMsg">请先打开摄像头后再切换画质</p>
+    <button type="button" id="qualityFailOk" class="primary">确定</button>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
