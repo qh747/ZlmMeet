@@ -63,7 +63,16 @@ function soloPublishOpts() {
     streamId,
     solo: true,
     onState: (s) => {
-      statusEl.textContent = '推流状态：' + s;
+      // 翻译 WebRTC connectionState → 中文，确保状态点颜色正确
+      const PUSH_STATE_MAP = {
+        new:          '初始化中',
+        connecting:   '连接中…',
+        connected:    '推流中',
+        disconnected: '连接已断开',
+        failed:       '连接失败',
+        closed:       '已关闭',
+      };
+      statusEl.textContent = PUSH_STATE_MAP[s] ?? ('推流状态：' + s);
       if (s === 'failed') setStatus('推流连接失败，请检查 ZLM 配置', true, 0);
     },
   };

@@ -9,13 +9,13 @@
 <body class="solo-page">
   <header class="topbar">
     <div class="topbar-left">
-      <a class="brand-link" href="index.html" title="返回首页">
+      <span class="brand-link">
         <span class="biz-tag biz-tag-play">拉流</span>
-      </a>
+      </span>
     </div>
-    <a class="topbar-center brand-link" href="index.html" title="返回首页">
+    <span class="topbar-center brand-link">
       <img src="assets/banner-mini.svg" alt="ZLMeetkit" class="topbar-banner" />
-    </a>
+    </span>
     <div class="topbar-chips">
       <span class="info-chip"><span class="chip-key">流</span><span class="chip-val" id="streamLabel">-</span></span>
       <span class="info-chip"><span class="chip-key">成员</span><span class="chip-val" id="memberName">-</span></span>
@@ -50,29 +50,4 @@
     </aside>
   </main>
 
-  <footer class="toolbar">
-    <button id="btnStart" class="toolbar-btn active" title="开始/停止拉流">▶️<span class="label">开始拉流</span></button>
-    <button id="btnChat" class="toolbar-btn" title="聊天">💬<span class="label">聊天</span></button>
-    <button id="btnLeave" class="toolbar-btn danger" title="返回首页">⛔<span class="label">退出</span></button>
-  </footer>
-
-  <div id="statusBar" class="status-bar hidden"></div>
-
-  <script type="module" src="js/play.js"></script>
-  <script>
-    (function () {
-      const chip = document.getElementById('streamStateChip');
-      const el = document.getElementById('streamState');
-      if (!chip || !el) return;
-      const map = (txt) => {
-        if (/失败|错误|断/.test(txt)) return 'error';
-        if (/已建立|播放|连接|成功|拉流中/.test(txt)) return 'active';
-        return '';
-      };
-      const sync = () => chip.setAttribute('data-state', map(el.textContent || ''));
-      new MutationObserver(sync).observe(el, { childList: true, characterData: true, subtree: true });
-      sync();
-    })();
-  </script>
-</body>
-</html>
+  <footer clas

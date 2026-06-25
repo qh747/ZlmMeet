@@ -1385,27 +1385,37 @@ input { font-family: inherit; }
     var(--stage-bg);
 }
 .stage, .solo-stage { position: relative; background: transparent; }
-.stage::before, .solo-stage::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse 80% 65% at 50% 40%, black 30%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 65% at 50% 40%, black 30%, transparent 100%);
-  z-index: 0;
-}
+/* 不使用网格背景线，避免在瓦片间隙显示灰色竖杠 */
+.stage::before, .solo-stage::before { display: none; }
 .video-grid, .solo-video-wrap, .solo-info, .chat-panel { position: relative; z-index: 1; }
+
+/* ----- solo 布局：视频靠左，流信息弹性拉伸 ----- */
+.solo-video-wrap { justify-content: flex-start !important; }
+.solo-info {
+  flex: 1 1 260px !important;
+  max-width: 420px;
+}
+@media (max-width: 720px) {
+  .solo-info { max-width: none !important; }
+}
 
 /* ----- 视频图块 ----- */
 .video-tile {
   background: radial-gradient(ellipse 90% 70% at 50% 35%, #131619 0%, #050607 100%);
+  /* 边框保持原色，不用 teal，避免相邻瓦片间出现绿色竖线 */
   box-shadow:
     var(--shadow-sm),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    inset 0 1px 0 rgba(46, 196, 182, 0.18),   /* 内侧顶部青绿高光线 */
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+    inset 0 -40px 80px rgba(0, 0, 0, 0.55);
+  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+.video-tile:hover {
+  border-color: rgba(46, 196, 182, 0.35);
+  box-shadow:
+    var(--shadow-md),
+    inset 0 1px 0 rgba(46, 196, 182, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
     inset 0 -40px 80px rgba(0, 0, 0, 0.55);
 }
 .video-tile .name-tag {
@@ -1435,6 +1445,9 @@ input { font-family: inherit; }
   background: transparent;
   padding: 14px 20px 20px;
   pointer-events: none;
+  width: fit-content;     /* 收缩到按钮实际宽度 */
+  margin-left: auto;
+  margin-right: auto;
 }
 .meeting-page .toolbar > *, .solo-page .toolbar > * { pointer-events: auto; }
 .meeting-page .toolbar::before, .solo-page .toolbar::before {
@@ -1443,18 +1456,18 @@ input { font-family: inherit; }
   left: 50%;
   bottom: 12px;
   transform: translateX(-50%);
-  width: max-content;
-  max-width: calc(100% - 24px);
+  width: 100%;               /* 随工具栏 fit-content 宽度对齐，两端留 padding 即可 */
   height: calc(100% - 18px);
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(28, 31, 36, 0.88) 0%, rgba(14, 16, 19, 0.88) 100%);
-  border: 1px solid var(--border-strong);
+  background: linear-gradient(180deg, rgba(28, 31, 36, 0.92) 0%, rgba(14, 16, 19, 0.92) 100%);
+  border: 1px solid rgba(46, 196, 182, 0.25);       /* 青绿色胶囊边框 */
   backdrop-filter: blur(20px) saturate(170%);
   -webkit-backdrop-filter: blur(20px) saturate(170%);
   box-shadow:
     0 20px 50px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(255, 255, 255, 0.025) inset,
-    0 1px 0 rgba(255, 255, 255, 0.06) inset;
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 1px 0  rgba(46, 196, 182, 0.18) inset,        /* 顶部青绿高光线 */
+    0 -1px 0 rgba(255, 255, 255, 0.04) inset;
   pointer-events: none;
   z-index: 0;
 }
@@ -1554,14 +1567,17 @@ input { font-family: inherit; }
   line-height: 1.6;
 }
 
-/* ----- solo-tile（无水印，干净） ----- */
+
+/* ----- solo-tile（边框光晕，简洁风格） ----- */
 .solo-tile {
-  border: 1px solid var(--border-strong);
+  border: 1px solid rgba(46, 196, 182, 0.28);
   box-shadow:
     var(--shadow-md),
+    inset 0 1px 0 rgba(46, 196, 182, 0.30),   /* 内侧顶部青绿高光线 */
     inset 0 0 0 1px rgba(255, 255, 255, 0.02),
     inset 0 -50px 100px rgba(0, 0, 0, 0.5);
   background: radial-gradient(ellipse 70% 60% at 50% 40%, #15191d 0%, #050607 100%);
+  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
 }
 
 /* ----- 聊天面板 ----- */
@@ -1578,7 +1594,7 @@ input { font-family: inherit; }
 .chat-panel:not(.hidden) { animation: chat-slide 0.25s var(--ease); }
 @keyframes chat-slide {
   from { transform: translateX(8px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(0);   opacity: 1; }
 }
 .chat-header span::before {
   content: '';
@@ -1604,8 +1620,8 @@ input { font-family: inherit; }
 }
 .rec-dot { animation: rec-pulse 1.4s ease-in-out infinite; box-shadow: 0 0 8px rgba(240, 82, 82, 0.6); }
 @keyframes rec-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.45; transform: scale(0.85); }
+  0%, 100% { opacity: 1;    transform: scale(1);    }
+  50%       { opacity: 0.45; transform: scale(0.85); }
 }
 
 .status-bar {

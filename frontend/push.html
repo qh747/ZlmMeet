@@ -9,13 +9,13 @@
 <body class="solo-page">
   <header class="topbar">
     <div class="topbar-left">
-      <a class="brand-link" href="index.html" title="返回首页">
+      <span class="brand-link">
         <span class="biz-tag biz-tag-push">推流</span>
-      </a>
+      </span>
     </div>
-    <a class="topbar-center brand-link" href="index.html" title="返回首页">
+    <span class="topbar-center brand-link">
       <img src="assets/banner-mini.svg" alt="ZLMeetkit" class="topbar-banner" />
-    </a>
+    </span>
     <div class="topbar-chips">
       <span class="info-chip"><span class="chip-key">流</span><span class="chip-val" id="streamLabel">-</span></span>
       <span class="info-chip status-chip" id="streamStateChip"><span class="status-dot"></span><span class="chip-val" id="streamState">未开始</span></span>
@@ -101,7 +101,7 @@
       if (!chip || !el) return;
       const map = (txt) => {
         if (/失败|错误|断/.test(txt)) return 'error';
-        if (/已建立|推流中|连接|成功/.test(txt)) return 'active';
+        if (/已建立|推流中|成功/.test(txt)) return 'active';
         return '';
       };
       const sync = () => chip.setAttribute('data-state', map(el.textContent || ''));
