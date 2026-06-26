@@ -3,6 +3,7 @@ package zlm
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -37,9 +38,8 @@ func New(cfg config.ZLMConfig) *Client {
 // ── Hook record cache ──────────────────────────────────────────────────────────
 // ZLMediaKit can be configured with hook.on_record_mp4 pointing to our
 // /api/zlm-hook/record-mp4 endpoint. When a recording completes, ZLM posts the
-// file metadata and we cache it. ResolveLatestRecordURL checks this cache on
-// each poll iteration, so the hook notification (when configured) eliminates
-// the polling delay entirely.
+// file metadata and we cache it. ResolveLatestRecordURL only reads this cache;
+// it does not poll ZLM's getMp4RecordFile API.
 
 type hookRecord struct {
 	FullURL string    // complete playable HTTP URL (api_base + path)
@@ -234,67 +234,6 @@ func (c *Client) recordCall(path string, q url.Values, label string) error {
 	return nil
 }
 
-// mp4RecordResponse mirrors ZLM's /index/api/getMp4RecordFile JSON response.
-type mp4RecordResponse struct {
-	Code int            `json:"code"`
-	Msg  string         `json:"msg"`
-	Data *mp4RecordData `json:"data"`
-}
-type mp4RecordData struct {
-	Paths    []string `json:"paths"`
-	RootPath string   `json:"rootPath"`
-}
-
-// GetMp4RecordFiles returns recorded MP4 files (paths ending with .mp4) for a
-// given app/stream on today's date. ZLM's API may also return bare directory
-// entries — those are filtered out.
-// The second return value is the rootPath from ZLM, which encodes the URL path
-// prefix (everything after "www/") for constructing playable HTTP URLs.
-func (c *Client) GetMp4RecordFiles(app, stream string) ([]string, string, error) {
-	q := url.Values{}
-	q.Set("secret", c.cfg.Secret)
-	q.Set("vhost", defaultVhost)
-	q.Set("app", app)
-	q.Set("stream", stream)
-
-	endpoint := strings.TrimRight(c.cfg.APIBase, "/") + "/index/api/getMp4RecordFile?" + q.Encode()
-	resp, err := c.httpClient.Get(endpoint)
-	if err != nil {
-		return nil, "", fmt.Errorf("call getMp4RecordFile: %w", err)
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, "", fmt.Errorf("read getMp4RecordFile response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("zlm getMp4RecordFile http %d: %s", resp.StatusCode, string(body))
-	}
-	var parsed mp4RecordResponse
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return nil, "", fmt.Errorf("decode getMp4RecordFile: %w (raw=%s)", err, string(body))
-	}
-	if parsed.Code != 0 {
-		return nil, "", fmt.Errorf("zlm getMp4RecordFile error code=%d msg=%s", parsed.Code, parsed.Msg)
-	}
-	if parsed.Data == nil || len(parsed.Data.Paths) == 0 {
-		return nil, "", nil // no recordings found
-	}
-
-	// Filter: only return paths that are actual .mp4 files, not bare directories.
-	files := make([]string, 0, len(parsed.Data.Paths))
-	for _, p := range parsed.Data.Paths {
-		if strings.HasSuffix(p, ".mp4") {
-			files = append(files, p)
-		}
-	}
-	rootPath := parsed.Data.RootPath
-	if len(files) == 0 {
-		return nil, rootPath, nil
-	}
-	return files, rootPath, nil
-}
-
 // buildRecordURLPrefix extracts the HTTP-accessible path prefix from ZLM's
 // rootPath. ZLM serves its www/ directory at its HTTP root, so a rootPath of
 // "/path/to/www/record/live/pub/" maps to URL prefix "/record/live/pub/".
@@ -377,35 +316,26 @@ func FilePathToHTTP(abs string) string {
 	return rel
 }
 
-// ResolveLatestRecordURL resolves a playable HTTP URL for the most recent
-// recording of (app, stream) with two sources:
-//
-//  1. ZLM hook cache — if hook.on_record_mp4 has fired, return immediately.
-//  2. ZLM getMp4RecordFile API — polled as fallback (10 retries × 500ms).
+// ErrRecordHookPending is returned when on_record_mp4 hook notification did not
+// arrive within the wait window (hook missing or misconfigured).
+var ErrRecordHookPending = errors.New("record mp4 hook not received")
+
+// ResolveLatestRecordURL waits for a playable HTTP URL from the on_record_mp4
+// hook cache. ZLM must POST to /api/zlm-hook/record-mp4 when a recording
+// finishes; no ZLM REST polling is performed.
 func (c *Client) ResolveLatestRecordURL(app, stream string) (string, error) {
-	// Wait for ZLM hook (on_record_mp4) which carries file_name + url.
-	// Poll cache up to 10 times; fall back to getMp4RecordFile API if hook is slow.
-	var lastErr error
-	for i := 0; i < 10; i++ {
+	const maxAttempts = 10
+	const interval = 500 * time.Millisecond
+
+	for i := 0; i < maxAttempts; i++ {
 		if u, ok := c.lookupHookRecord(app, stream); ok {
 			return u, nil
 		}
-
-		paths, rootPath, err := c.GetMp4RecordFiles(app, stream)
-		if err != nil {
-			lastErr = err
-		} else if len(paths) > 0 {
-			latestFile := paths[len(paths)-1]
-			urlPrefix := buildRecordURLPrefix(rootPath)
-			base := strings.TrimRight(c.cfg.APIBase, "/")
-			urlPrefix = strings.TrimPrefix(urlPrefix, "/")
-			return base + "/" + urlPrefix + latestFile, nil
-		} else {
-			lastErr = fmt.Errorf("waiting for hook notification (app=%s stream=%s)", app, stream)
+		if i < maxAttempts-1 {
+			time.Sleep(interval)
 		}
-		time.Sleep(500 * time.Millisecond)
 	}
-	return "", fmt.Errorf("resolve record url after 10 retries: %w", lastErr)
+	return "", fmt.Errorf("%w (app=%s stream=%s)", ErrRecordHookPending, app, stream)
 }
 
 // CloseStream forcibly closes a single stream (all schemas) within `app`.
@@ -437,4 +367,54 @@ func (c *Client) CloseStream(app, stream string) error {
 		return fmt.Errorf("zlm close_streams error code=%d", parsed.Code)
 	}
 	return nil
+}
+
+// MediaInfo is a simplified view of one ZLM media entry.
+type MediaInfo struct {
+	App              string `json:"app"`
+	Stream           string `json:"stream"`
+	Schema           string `json:"schema"`
+	Vhost            string `json:"vhost"`
+	ReaderCount      int    `json:"readerCount"`
+	TotalReaderCount int    `json:"totalReaderCount"`
+	BytesSpeed       int    `json:"bytesSpeed"`
+	AliveSecond      int    `json:"aliveSecond"`
+	CreateStamp      int64  `json:"createStamp"`
+	OriginType       int    `json:"originType"`
+	OriginTypeStr    string `json:"originTypeStr"`
+}
+
+type mediaListResponse struct {
+	Code int         `json:"code"`
+	Msg  string      `json:"msg"`
+	Data []MediaInfo `json:"data"`
+}
+
+// GetMediaList returns active media streams from ZLM.
+func (c *Client) GetMediaList() ([]MediaInfo, error) {
+	q := url.Values{}
+	q.Set("secret", c.cfg.Secret)
+	q.Set("vhost", defaultVhost)
+
+	endpoint := strings.TrimRight(c.cfg.APIBase, "/") + "/index/api/getMediaList?" + q.Encode()
+	resp, err := c.httpClient.Get(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("call getMediaList: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read getMediaList response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("zlm getMediaList http %d: %s", resp.StatusCode, string(body))
+	}
+	var parsed mediaListResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, fmt.Errorf("decode getMediaList: %w (raw=%s)", err, string(body))
+	}
+	if parsed.Code != 0 {
+		return nil, fmt.Errorf("zlm getMediaList error code=%d msg=%s", parsed.Code, parsed.Msg)
+	}
+	return parsed.Data, nil
 }

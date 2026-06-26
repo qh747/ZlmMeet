@@ -1,10 +1,13 @@
 # 信令服务监听
-listen: ":8080"
+listen: ":7443"
 
 # 可选 TLS（局域网多设备测试访问摄像头需要 HTTPS/WSS）
 # 留空则以 HTTP 监听；填写后以 HTTPS 监听。
 tls_cert: "cert.pem"
 tls_key: "key.pem"
+
+# 日志级别：debug | info | warn | error（留空默认 info）
+log_level: "info"
 
 # 前端静态文件目录（相对于可执行文件运行目录），留空则不托管静态文件
 static_dir: "../frontend"
@@ -12,8 +15,13 @@ static_dir: "../frontend"
 # 允许的 WebSocket Origin，留空表示不校验（开发用）
 allowed_origins: []
 
-# 业务令牌；留空表示不校验（开发用）。前端发起业务时需携带一致令牌。
+# 业务令牌；留空表示不校验（开发用）。前端业务与管理后台共用同一令牌。
 token: ""
+
+# 管理后台 HTTPS 监听（独立于业务端口，复用上方 tls_cert / tls_key 与 token）。
+# 留空 admin_listen 则不启动管理端口。勿与 ZLM 默认 HTTPS 端口 8443 冲突。
+admin_listen: ":9443"
+admin_static_dir: "../../frontend/admin"
 
 # ZLMediaKit 配置
 # 提示：ZLM 流路径中的 app 字段由前端「房间号」决定，不在此处配置。

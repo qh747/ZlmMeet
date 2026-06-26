@@ -1,6 +1,7 @@
 /** Styled alert dialog matching the app dark-glass UI. */
 
 export const TOKEN_ERROR_MESSAGE = '令牌输入错误';
+export const RECORD_HOOK_ERROR_MESSAGE = '请联系管理员配置录像事件处理流程';
 
 let dialog;
 let titleEl;
@@ -64,4 +65,8 @@ export function isTokenError(message) {
 
 export function showTokenErrorAlert() {
   return showAppAlert(TOKEN_ERROR_MESSAGE, { title: '令牌错误' });
+}
+
+export function showRecordHookErrorAlert() {
+  return showAppAlert(RECORD_HOOK_ERROR_MESSAGE, { title: '无法获取录像' });
 }

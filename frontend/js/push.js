@@ -13,7 +13,7 @@ import {
   wireQualityUI,
   syncQualityButtonLabel,
 } from './quality.js';
-import { showAppAlert, isTokenError, showTokenErrorAlert } from './ui-alert.js';
+import { showAppAlert, isTokenError, showTokenErrorAlert, showRecordHookErrorAlert } from './ui-alert.js';
 
 import { initSoloLayout } from './solo-layout.js';
 import { wireSoloChat } from './solo-chat.js';
@@ -221,6 +221,8 @@ function onRecordState(p) {
   if (!state.recording && p.recordFileUrl) {
     pendingRecordFileUrl = p.recordFileUrl;
     showPreview(p.recordFileUrl);
+  } else if (!state.recording && !p.recordFileUrl) {
+    showRecordHookErrorAlert();
   }
 }
 

@@ -20,10 +20,15 @@ type Config struct {
 	Listen         string    `yaml:"listen"`
 	TLSCert        string    `yaml:"tls_cert"`
 	TLSKey         string    `yaml:"tls_key"`
+	LogLevel       string    `yaml:"log_level"`
 	StaticDir      string    `yaml:"static_dir"`
 	AllowedOrigins []string  `yaml:"allowed_origins"`
 	// Token is required on business requests when non-empty (entry-check + join).
 	Token          string    `yaml:"token"`
+	// Admin HTTPS listener and static admin UI (separate from business port).
+	// Uses the same tls_cert / tls_key and token as the business server.
+	AdminListen    string    `yaml:"admin_listen"`
+	AdminStaticDir string    `yaml:"admin_static_dir"`
 	ZLM            ZLMConfig `yaml:"zlm"`
 }
 

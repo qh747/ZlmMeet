@@ -9,11 +9,16 @@
 <body class="home-page">
   <main class="home-wrap">
     <div class="home-shell">
-      <header class="home-header">
-        <p class="home-eyebrow">ZLMeetkit · WebRTC</p>
-        <h1>ZLMeet 会议</h1>
-        <p class="subtitle">选择业务场景，开始实时音视频</p>
-      </header>
+      <div class="home-top">
+        <img src="assets/banner.svg" alt="ZLMeetkit" class="home-banner" />
+      </div>
+      <div class="home-body">
+        <h1 class="home-title">
+          <span class="home-title-brand">ZLMeet 会议</span>
+          <span class="home-title-sep" aria-hidden="true"></span>
+          <span class="home-title-sub">业务选择</span>
+        </h1>
+        <div class="shell-title-divider" aria-hidden="true"></div>
 
       <section class="home-grid">
         <button class="home-card" data-biz="meeting">
@@ -53,6 +58,7 @@
           <span class="card-arrow" aria-hidden="true">→</span>
         </button>
       </section>
+      </div>
     </div>
 
     <dialog id="formDialog" class="home-dialog">

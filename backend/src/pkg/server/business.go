@@ -3,21 +3,21 @@ package server
 import (
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/rs/zerolog/log"
 
 	"zlm_meet/backend/pkg/config"
 	"zlm_meet/backend/pkg/signaling"
 	"zlm_meet/backend/pkg/zlm"
 )
 
-// New builds an http.Handler with WebSocket signaling and static file serving.
-func New(cfg *config.Config, hub *signaling.Hub) http.Handler {
+// NewBusiness builds an http.Handler with WebSocket signaling and static file serving.
+func NewBusiness(cfg *config.Config, hub *signaling.Hub) http.Handler {
 	mux := http.NewServeMux()
 
 	upgrader := &websocket.Upgrader{
@@ -83,34 +83,38 @@ func New(cfg *config.Config, hub *signaling.Hub) http.Handler {
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			log.Printf("[zlm-hook] read body: %v", err)
+			log.Warn().Err(err).Msg("zlm-hook read body")
 			writeZLMHookOK() // on_record_mp4 is fire-and-forget; always ack 200
 			return
 		}
 
 		var h zlm.RecordMp4HookPayload
 		if err := json.Unmarshal(body, &h); err != nil {
-			log.Printf("[zlm-hook] unmarshal: %v raw=%s", err, string(body))
+			log.Warn().Err(err).Str("raw", string(body)).Msg("zlm-hook unmarshal")
 			writeZLMHookOK()
 			return
 		}
 		if h.App == "" || h.Stream == "" {
-			log.Printf("[zlm-hook] missing app/stream: %s", string(body))
+			log.Warn().Str("body", string(body)).Msg("zlm-hook missing app/stream")
 			writeZLMHookOK()
 			return
 		}
 
 		fullURL := zlm.BuildRecordURLFromHook(cfg.ZLM.APIBase, &h)
 		if fullURL == "" {
-			log.Printf("[zlm-hook] cannot build url from hook: app=%s stream=%s file_name=%s url=%q file_path=%q",
-				h.App, h.Stream, h.FileName, h.URL, h.FilePath)
+			log.Warn().
+				Str("app", h.App).Str("stream", h.Stream).Str("file_name", h.FileName).
+				Str("url", h.URL).Str("file_path", h.FilePath).
+				Msg("zlm-hook cannot build url")
 			writeZLMHookOK()
 			return
 		}
 
 		hub.ZLM().StoreHookRecord(h.App, h.Stream, fullURL)
-		log.Printf("[zlm-hook] record: app=%s stream=%s file=%s size=%d len=%.1fs url=%s",
-			h.App, h.Stream, h.FileName, h.FileSize, h.TimeLen, fullURL)
+		log.Info().
+			Str("app", h.App).Str("stream", h.Stream).Str("file", h.FileName).
+			Int64("size", h.FileSize).Float64("len_sec", h.TimeLen).Str("url", fullURL).
+			Msg("zlm-hook record")
 		writeZLMHookOK()
 	})
 
@@ -153,7 +157,8 @@ func New(cfg *config.Config, hub *signaling.Hub) http.Handler {
 		// Only accept 200 OK or 206 Partial Content from ZLM.
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 			body, _ := io.ReadAll(resp.Body)
-			log.Printf("[record-file] zlm returned HTTP %d for %s: %s", resp.StatusCode, fileURL, string(body))
+			log.Warn().Int("status", resp.StatusCode).Str("url", fileURL).Str("body", string(body)).
+				Msg("record-file upstream error")
 			http.Error(w, "upstream error", http.StatusBadGateway)
 			return
 		}
@@ -191,7 +196,7 @@ func New(cfg *config.Config, hub *signaling.Hub) http.Handler {
 	if cfg.StaticDir != "" {
 		fs := http.FileServer(http.Dir(cfg.StaticDir))
 		mux.Handle("/", fs)
-		log.Printf("[server] serving static files from %s", cfg.StaticDir)
+		log.Info().Str("path", cfg.StaticDir).Msg("serving business static files")
 	}
 
 	return mux

@@ -19,7 +19,7 @@ import {
   wireQualityUI,
   syncQualityButtonLabel,
 } from './quality.js';
-import { showAppAlert, isTokenError, showTokenErrorAlert } from './ui-alert.js';
+import { showAppAlert, isTokenError, showTokenErrorAlert, showRecordHookErrorAlert } from './ui-alert.js';
 
 // Resolve mode: meeting.html uses 'meeting'; call.html uses 'call'.
 const urlParams = new URLSearchParams(location.search);
@@ -156,6 +156,9 @@ ui.setMyLabel(state.myNickname);
 
 window.addEventListener('beforeunload', () => leave({ navigate: false }));
 
+// Wire toolbar immediately so Leave / toggles work even if camera or signaling fails.
+wireToolbar();
+
 main().catch((err) => {
   console.error(err);
   ui.showStatus('启动失败：' + err.message, { error: true, durationMs: 0 });
@@ -184,8 +187,13 @@ async function main() {
         video: state.camOn ? getVideoConstraints(state.quality) : false,
       })
       .catch((err) => {
-        ui.showStatus('无法访问摄像头/麦克风：' + err.message, { error: true, durationMs: 0 });
-        throw err;
+        // Camera / mic unavailable — fall back so signaling and toolbar still work.
+        state.micOn = false;
+        state.camOn = false;
+        ui.setButtonState('btnMic', 'off');
+        ui.setButtonState('btnCam', 'off');
+        ui.showStatus('无法访问摄像头/麦克风：' + err.message, { error: true, durationMs: 6000 });
+        return new MediaStream();
       })
     : Promise.resolve(new MediaStream());
 
@@ -233,7 +241,6 @@ async function main() {
     isSelf: true,
     stream: hasLocalTracks ? localStream : null,
   });
-  wireToolbar();
   state.signaling.send('media-state', { micOn: state.micOn, camOn: state.camOn });
   if (!hasLocalTracks) {
     ui.showStatus('已加入，当前未开启麦克风或摄像头');
@@ -518,7 +525,7 @@ function applyRecordState(p) {
     pendingRecordKind = p.kind || 'cam';
     showPreview(p.recordFileUrl, pendingRecordKind);
   } else if (!p.recording && !p.recordFileUrl) {
-    ui.showStatus('录制已停止，但未获取到文件地址', { error: true });
+    showRecordHookErrorAlert();
   }
 }
 

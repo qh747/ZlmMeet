@@ -2,9 +2,10 @@ package signaling
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 // Room maintains the membership and broadcast logic for a single meeting room.
@@ -129,7 +130,7 @@ func (r *Room) addClient(c *Client, requestedMode string) error {
 	r.clients[c.UserID] = c
 	r.mu.Unlock()
 
-	log.Printf("[room %s mode=%s] join: %s (%s)", r.ID, r.Mode, c.UserID, c.Nickname)
+	log.Info().Str("room", r.ID).Str("mode", r.Mode).Str("user_id", c.UserID).Str("nickname", c.Nickname).Msg("join")
 
 	// Tell the joiner who is already here.
 	peers := r.snapshotPeers(c.UserID)
@@ -169,7 +170,7 @@ func (r *Room) removeClient(c *Client) {
 	delete(r.clients, c.UserID)
 	r.mu.Unlock()
 
-	log.Printf("[room %s] leave: %s", r.ID, c.UserID)
+	log.Info().Str("room", r.ID).Str("user_id", c.UserID).Msg("leave")
 
 	// Collect streams + active recordings under client lock. We also keep the
 	// kind→sid mapping so we can broadcast peer-stream-stopped before the
@@ -205,12 +206,12 @@ func (r *Room) removeClient(c *Client) {
 	go func(recordSids, sids []string) {
 		for _, sid := range recordSids {
 			if err := r.hub.zlm.StopRecord(app, sid, zlmRecordType()); err != nil {
-				log.Printf("[room %s] stop record %s: %v", r.ID, sid, err)
+				log.Warn().Err(err).Str("room", r.ID).Str("stream", sid).Msg("stop record")
 			}
 		}
 		for _, sid := range sids {
 			if err := r.hub.zlm.CloseStream(app, sid); err != nil {
-				log.Printf("[room %s] close stream %s: %v", r.ID, sid, err)
+				log.Warn().Err(err).Str("room", r.ID).Str("stream", sid).Msg("close stream")
 			}
 		}
 	}(recordSids, sids)

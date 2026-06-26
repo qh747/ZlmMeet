@@ -2,9 +2,10 @@ package signaling
 
 import (
 	"errors"
-	"log"
 	"strings"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 
 	"zlm_meet/backend/pkg/zlm"
 )
@@ -61,7 +62,7 @@ func (h *Hub) removeRoomIfEmpty(r *Room) {
 	defer h.mu.Unlock()
 	if r.size() == 0 {
 		delete(h.rooms, r.ID)
-		log.Printf("[hub] room %s removed (empty)", r.ID)
+		log.Debug().Str("room", r.ID).Msg("room removed (empty)")
 	}
 }
 

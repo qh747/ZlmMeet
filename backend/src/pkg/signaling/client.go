@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/rs/zerolog/log"
 
 	"zlm_meet/backend/pkg/zlm"
 )
@@ -58,7 +58,7 @@ func newClient(conn *websocket.Conn, hub *Hub) *Client {
 func ServeWS(hub *Hub, upgrader *websocket.Upgrader, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("[ws] upgrade: %v", err)
+		log.Warn().Err(err).Msg("ws upgrade")
 		return
 	}
 	c := newClient(conn, hub)
@@ -79,7 +79,7 @@ func (c *Client) readLoop() {
 		_, raw, err := c.conn.ReadMessage()
 		if err != nil {
 			if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				log.Printf("[client %s] read: %v", c.UserID, err)
+				log.Debug().Err(err).Str("user_id", c.UserID).Msg("client read")
 			}
 			return
 		}
@@ -142,13 +142,13 @@ func (c *Client) cleanup() {
 func (c *Client) send(msgType, reqID string, payload any) {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("[client %s] marshal payload: %v", c.UserID, err)
+		log.Warn().Err(err).Str("user_id", c.UserID).Msg("marshal payload")
 		return
 	}
 	env := Envelope{Type: msgType, ReqID: reqID, Payload: body}
 	raw, err := json.Marshal(env)
 	if err != nil {
-		log.Printf("[client %s] marshal envelope: %v", c.UserID, err)
+		log.Warn().Err(err).Str("user_id", c.UserID).Msg("marshal envelope")
 		return
 	}
 	c.mu.RLock()
@@ -160,7 +160,7 @@ func (c *Client) send(msgType, reqID string, payload any) {
 	select {
 	case c.sendCh <- raw:
 	default:
-		log.Printf("[client %s] send buffer full, dropping %s", c.UserID, msgType)
+		log.Warn().Str("user_id", c.UserID).Str("type", msgType).Msg("send buffer full, dropping")
 	}
 }
 
@@ -440,7 +440,7 @@ func (c *Client) handleStreamStopped(env *Envelope) error {
 		c.room.broadcastStreamStopped(c, p.Kind, sid)
 		go func(app, streamID string) {
 			if err := c.hub.zlm.CloseStream(app, streamID); err != nil {
-				log.Printf("[client %s] close stream %s: %v", c.UserID, streamID, err)
+				log.Warn().Err(err).Str("user_id", c.UserID).Str("stream", streamID).Msg("close stream")
 			}
 		}(c.room.ID, sid)
 	}
@@ -549,7 +549,7 @@ func (c *Client) handleRecordControl(env *Envelope, start bool) error {
 	// When stopping, resolve the recorded file URL from ZLM (with retries).
 	if !start {
 		if url, err := c.hub.zlm.ResolveLatestRecordURL(c.room.ID, streamID); err != nil {
-			log.Printf("[record] resolve url for %s/%s: %v", c.room.ID, streamID, err)
+			log.Warn().Err(err).Str("room", c.room.ID).Str("stream", streamID).Msg("record resolve url")
 		} else {
 			state.RecordFileURL = url
 		}

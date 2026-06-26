@@ -517,39 +517,81 @@ input { font-family: inherit; }
   -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--border-strong);
   border-radius: calc(var(--radius-xl) + 4px);
-  padding: 40px 36px 36px;
+  padding: 0;
+  overflow: hidden;
   box-shadow: var(--shadow-lg), var(--shadow-inset);
 }
-.home-header {
-  text-align: center;
-  margin-bottom: 32px;
-  padding-bottom: 28px;
+
+.home-top {
+  padding: 0;
+  margin: 0;
+  line-height: 0;
   border-bottom: 1px solid var(--border);
+  overflow: hidden;
 }
-.home-eyebrow {
+
+.home-banner {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  object-position: center;
+}
+
+.shell-title-divider {
+  width: 100%;
+  height: 1px;
   margin: 0 0 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent-muted);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--border) 12%,
+    rgba(46, 196, 182, 0.35) 50%,
+    var(--border) 88%,
+    transparent 100%
+  );
 }
-.home-header h1 {
-  margin: 0 0 10px;
-  font-size: 36px;
+
+.home-body {
+  padding: 28px 36px 36px;
+}
+
+.home-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: clamp(14px, 2.2vw, 22px);
+  margin: 0 0 28px;
+  text-align: center;
+}
+
+.home-title-brand {
+  font-size: clamp(38px, 4.8vw, 44px);
   font-weight: 600;
   letter-spacing: -0.035em;
+  line-height: 1;
   background: linear-gradient(135deg, #ffffff 0%, var(--warm) 85%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
-.home-header .subtitle {
-  color: var(--muted);
-  margin: 0;
-  font-size: 15px;
+
+.home-title-sep {
+  flex-shrink: 0;
+  width: 1px;
+  height: clamp(26px, 3.4vw, 32px);
+  background: var(--border-strong);
+  opacity: 0.85;
+}
+
+.home-title-sub {
+  font-size: clamp(15px, 1.8vw, 18px);
   font-weight: 400;
-  line-height: 1.5;
+  letter-spacing: 0.16em;
+  text-indent: 0.16em;
+  line-height: 1;
+  color: var(--muted);
 }
 
 .home-grid {
@@ -653,9 +695,21 @@ input { font-family: inherit; }
 }
 
 @media (max-width: 640px) {
-  .home-shell { padding: 28px 20px 24px; }
+  .home-body { padding: 22px 20px 24px; }
   .home-grid { grid-template-columns: 1fr; }
-  .home-header h1 { font-size: 30px; }
+  .home-title {
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .shell-title-divider {
+    margin-bottom: 10px;
+  }
+  .home-title-brand { font-size: clamp(32px, 8vw, 38px); }
+  .home-title-sub {
+    font-size: clamp(14px, 3.6vw, 16px);
+    letter-spacing: 0.12em;
+    text-indent: 0.12em;
+  }
 }
 
 .home-dialog {

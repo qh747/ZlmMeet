@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZLMeetkit · 会议管理后台</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body class="admin-body">
+  <!-- 登录（默认显示） -->
+  <div id="loginView" class="admin-view admin-login-view is-active" aria-hidden="false">
+    <div class="admin-login-card">
+      <div class="admin-login-top">
+        <img src="/assets/banner.svg" alt="ZLMeetkit" class="admin-login-banner" />
+      </div>
+      <div class="admin-login-body">
+        <h1 class="admin-login-title">
+          <span class="admin-login-title-brand">ZLMeet 会议</span>
+          <span class="admin-login-title-sep" aria-hidden="true"></span>
+          <span class="admin-login-title-sub">管理后台</span>
+        </h1>
+        <div class="shell-title-divider" aria-hidden="true"></div>
+        <form id="loginForm" class="admin-login-form" autocomplete="off">
+          <label class="admin-login-field-row">
+            <span class="admin-token-label">登录令牌</span>
+            <input id="loginToken" type="password" placeholder="输入登录令牌以继续" autocomplete="off" />
+          </label>
+          <button type="submit" id="loginSubmit" class="admin-primary">登录</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主界面（登录成功后显示） -->
+  <div id="appView" class="admin-view admin-app" aria-hidden="true">
+    <header class="admin-app-header">
+      <div class="admin-header-brand">
+        <span class="admin-header-wordmark">ZLMeetkit</span>
+        <span class="admin-header-divider" aria-hidden="true"></span>
+        <span class="admin-header-tagline">REALTIME · MULTI-PARTY · VIDEO</span>
+      </div>
+      <div class="admin-header-actions">
+        <span id="lastRefresh" class="admin-refresh-time">—</span>
+        <button type="button" id="refreshBtn" class="admin-refresh-btn">刷新</button>
+        <button type="button" id="logoutBtn" class="admin-logout-btn">退出</button>
+      </div>
+    </header>
+
+    <aside class="admin-sidebar">
+      <nav class="admin-nav">
+        <button type="button" class="admin-nav-item active" data-page="dashboard" id="dashboardTab">
+          <span class="admin-nav-dot" aria-hidden="true"></span>
+          <span class="admin-nav-label">监控面板</span>
+        </button>
+      </nav>
+      <div class="admin-sidebar-footer">
+        <div class="admin-sidebar-footer-deck" aria-live="polite" aria-label="已登录时长">
+          <img
+            src="/assets/admin-sidebar-waveform.svg"
+            alt=""
+            class="admin-sidebar-footer-wave"
+            aria-hidden="true"
+          />
+          <div id="sessionDuration" class="admin-sidebar-session-time"></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <section id="dashboardPage" class="admin-page active">
+        <div class="admin-room-cards" id="roomCards"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>

@@ -151,6 +151,10 @@ window.addEventListener('beforeunload', () => leave());
 
 initSoloLayout();
 
+// Wire controls before async setup so Leave / pull toggle work if connect fails.
+btnStart.addEventListener('click', toggleStream);
+document.getElementById('btnLeave').addEventListener('click', () => leave({ navigate: true }));
+
 main().catch((err) => {
   console.error(err);
   setStatus('启动失败：' + err.message, true, 0);
@@ -205,8 +209,6 @@ async function main() {
   });
   state.joined = true;
 
-  btnStart.addEventListener('click', toggleStream);
-  document.getElementById('btnLeave').addEventListener('click', () => leave({ navigate: true }));
   setReadyUI();
 }
 
