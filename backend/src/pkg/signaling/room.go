@@ -79,6 +79,41 @@ func (r *Room) hasStreamID(streamID string) bool {
 	return false
 }
 
+// ClientNickname returns the nickname of a connected client, or userID if unknown.
+func (r *Room) ClientNickname(userID string) string {
+	r.mu.RLock()
+	c, ok := r.clients[userID]
+	r.mu.RUnlock()
+	if !ok || c.Nickname == "" {
+		return userID
+	}
+	return c.Nickname
+}
+
+// StreamOwnerNickname returns the nickname of whoever publishes streamID.
+func (r *Room) StreamOwnerNickname(streamID string) string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, c := range r.clients {
+		if c.IsObserver() {
+			continue
+		}
+		c.mu.RLock()
+		for _, sid := range c.streams {
+			if sid == streamID {
+				nick := c.Nickname
+				c.mu.RUnlock()
+				if nick == "" {
+					return c.UserID
+				}
+				return nick
+			}
+		}
+		c.mu.RUnlock()
+	}
+	return ""
+}
+
 // hasPushMember reports whether a solo push publisher is already in the room.
 func (r *Room) hasPushMember() bool {
 	r.mu.RLock()
@@ -113,11 +148,12 @@ func (r *Room) snapshotPeers(excludeID string) []PeerInfo {
 		}
 		c.mu.RLock()
 		info := PeerInfo{
-			UserID:   c.UserID,
-			Nickname: c.Nickname,
-			MicOn:    c.micOn,
-			CamOn:    c.camOn,
-			Streams:  make([]StreamInfo, 0, len(c.streams)),
+			UserID:         c.UserID,
+			Nickname:       c.Nickname,
+			MicOn:          c.micOn,
+			CamOn:          c.camOn,
+			ClientPlatform: c.clientPlatform,
+			Streams:        make([]StreamInfo, 0, len(c.streams)),
 		}
 		for kind, sid := range c.streams {
 			info.Streams = append(info.Streams, StreamInfo{Kind: kind, StreamID: sid})
@@ -189,10 +225,11 @@ func (r *Room) addClient(c *Client, requestedMode string) error {
 	// Tell others a new peer joined.
 	c.mu.RLock()
 	joinedPayload := PeerJoinedPayload{
-		UserID:   c.UserID,
-		Nickname: c.Nickname,
-		MicOn:    c.micOn,
-		CamOn:    c.camOn,
+		UserID:         c.UserID,
+		Nickname:       c.Nickname,
+		MicOn:          c.micOn,
+		CamOn:          c.camOn,
+		ClientPlatform: c.clientPlatform,
 	}
 	c.mu.RUnlock()
 	r.broadcastExcept(c.UserID, TypePeerJoined, joinedPayload)

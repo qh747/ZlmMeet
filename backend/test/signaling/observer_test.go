@@ -18,7 +18,7 @@ func TestObserverDoesNotFillCallCapacity(t *testing.T) {
 	}
 
 	obs := signaling.NewTestClient("obs1", "admin", nil)
-	obs.SetObserver("tok", "admin")
+	obs.SetObserver("tok", "admin", nil)
 	if err := h.AddTestObserverClient("call1", obs); err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestObserverExcludedFromStatsRealMembers(t *testing.T) {
 		t.Fatal(err)
 	}
 	obs := signaling.NewTestClient("obs1", "admin", nil)
-	obs.SetObserver("tok", "admin")
+	obs.SetObserver("tok", "admin", nil)
 	if err := h.AddTestObserverClient("m1", obs); err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestObserverDismissedWhenBusinessEnds(t *testing.T) {
 	}
 
 	obs := signaling.NewTestClient("obs1", "admin", nil)
-	obs.SetObserver("tok", "admin")
+	obs.SetObserver("tok", "admin", nil)
 	if err := h.AddTestObserverClient("m1", obs); err != nil {
 		t.Fatal(err)
 	}

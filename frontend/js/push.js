@@ -3,6 +3,7 @@
 // point with ZLMediaKit.
 
 import { Signaling } from './signaling.js';
+import { getClientPlatform } from './video-flip.js';
 import { publishStream, closePublishPC, publishOrUpdateStream } from './webrtc.js';
 import {
   getStoredQuality,
@@ -193,6 +194,10 @@ async function main() {
     }
     setStatus('服务器：' + p.message, true);
   });
+  state.signaling.on('admin-kicked', async (p) => {
+    await showAppAlert(p.message || '您已被管理员移出', { title: '已移出' });
+    leave({ navigate: true });
+  });
   state.signaling.on('_close', () => {
     void handleServiceDisconnect({ biz: 'push', signaling: state.signaling });
   });
@@ -217,6 +222,7 @@ async function main() {
     soloRole: 'push',
     streamId,
     token,
+    clientPlatform: getClientPlatform(),
   });
   state.joined = true;
 

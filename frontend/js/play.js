@@ -6,6 +6,7 @@ import { initSoloLayout } from './solo-layout.js';
 import { wireSoloChat } from './solo-chat.js';
 import { showAppAlert, isTokenError, showTokenErrorAlert } from './ui-alert.js';
 import { handleServiceDisconnect } from './network-error.js';
+import { getClientPlatform } from './video-flip.js';
 
 const room = sessionStorage.getItem('zlm.room') || '';
 const streamId = sessionStorage.getItem('zlm.streamId') || '';
@@ -178,6 +179,10 @@ async function main() {
     }
     setStatus('服务器：' + p.message, true);
   });
+  state.signaling.on('admin-kicked', async (p) => {
+    await showAppAlert(p.message || '您已被管理员移出', { title: '已移出' });
+    leave({ navigate: true });
+  });
   state.signaling.on('joined', (p) => { state.myUserId = p.userId; });
   state.signaling.on('peer-stream-started', (p) => {
     if (p.streamId !== streamId) return;
@@ -215,6 +220,7 @@ async function main() {
     mode: 'solo',
     soloRole: 'play',
     token,
+    clientPlatform: getClientPlatform(),
   });
   state.joined = true;
 

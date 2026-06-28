@@ -183,6 +183,13 @@ input { font-family: inherit; }
   object-fit: cover;
   background: #000;
 }
+.video-tile .video-flip-x {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
 .video-tile .name-tag {
   position: absolute;
   left: 10px;
@@ -1223,6 +1230,13 @@ input { font-family: inherit; }
   object-fit: contain;
   background: #000;
 }
+.solo-tile .video-flip-x {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
 .solo-info {
   flex: 0 0 236px;
   align-self: stretch;
@@ -1546,6 +1560,26 @@ input { font-family: inherit; }
   .info-chip .chip-key { display: none; }
   .info-chip .chip-val { max-width: 72px; font-size: 11px; }
   .biz-tag { font-size: 10px; padding: 3px 8px 3px 6px; }
+}
+
+/* Camera mirror correction — wrapper present only when flip is needed (see video-flip.js). */
+.video-flip-x,
+.solo-tile .video-flip-x,
+.admin-watch-video-flip {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  -webkit-transform: scaleX(-1);
+  transform: scaleX(-1);
+}
+
+.video-flip-x video,
+.solo-tile .video-flip-x video,
+.admin-watch-video-flip .admin-watch-video {
+  -webkit-transform: none;
+  transform: none;
 }
 
 /* iOS — reduce backdrop blur cost on low-end devices */

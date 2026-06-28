@@ -8,6 +8,7 @@
 //   - Render UI updates via MeetingUI.
 
 import { Signaling } from './signaling.js';
+import { getClientPlatform } from './video-flip.js';
 import { publishStream, playStream, closePC, closePublishPC, publishOrUpdateStream } from './webrtc.js';
 import { MeetingUI } from './ui.js';
 import {
@@ -221,6 +222,7 @@ async function main() {
     token: state.token,
     micOn: state.micOn,
     camOn: state.camOn,
+    clientPlatform: getClientPlatform(),
   });
 
   // (3) Local media ready → publish first so existing peers can pull ASAP,
@@ -250,6 +252,7 @@ async function main() {
   ui.upsertTile('self', {
     nickname: state.myNickname + '（我）',
     isSelf: true,
+    sourcePlatform: getClientPlatform(),
     stream: hasLocalTracks ? localStream : null,
   });
   state.signaling.send('media-state', { micOn: state.micOn, camOn: state.camOn });
@@ -275,10 +278,13 @@ function buildWsURL() {
 
 // === Signaling event handlers ================================================
 
-function ensurePeerPlaceholderTile(userId, nickname, { micOn, camOn } = {}) {
-  const peer = ensurePeer(userId, nickname);
+function ensurePeerPlaceholderTile(userId, nickname, { micOn, camOn, clientPlatform } = {}) {
+  const peer = ensurePeer(userId, nickname, clientPlatform);
   const tileKey = `peer-${userId}-cam`;
-  ui.upsertTile(tileKey, { nickname: peer.nickname });
+  ui.upsertTile(tileKey, {
+    nickname: peer.nickname,
+    sourcePlatform: peer.clientPlatform,
+  });
   if (micOn !== undefined || camOn !== undefined) {
     ui.updateBadges(tileKey, {
       micOn: micOn !== undefined ? micOn : true,
@@ -296,6 +302,7 @@ function wireSignalHandlers(sig) {
       ensurePeerPlaceholderTile(peer.userId, peer.nickname, {
         micOn: peer.micOn,
         camOn: peer.camOn,
+        clientPlatform: peer.clientPlatform,
       });
       for (const s of peer.streams || []) {
         notePeerStreamKind(peer.userId, s.kind);
@@ -308,6 +315,7 @@ function wireSignalHandlers(sig) {
     ensurePeerPlaceholderTile(p.userId, p.nickname, {
       micOn: p.micOn,
       camOn: p.camOn,
+      clientPlatform: p.clientPlatform,
     });
     ui.appendSystem(`${p.nickname} 加入了`);
   });
@@ -377,6 +385,11 @@ function wireSignalHandlers(sig) {
     ui.showStatus('服务器：' + p.message, { error: true });
   });
 
+  sig.on('admin-kicked', async (p) => {
+    await showAppAlert(p.message || '您已被管理员移出', { title: '已移出' });
+    leave({ navigate: true });
+  });
+
   sig.on('_close', () => {
     void handleServiceDisconnect({
       biz: IS_CALL ? 'call' : 'meeting',
@@ -385,13 +398,18 @@ function wireSignalHandlers(sig) {
   });
 }
 
-function ensurePeer(userId, nickname) {
+function ensurePeer(userId, nickname, clientPlatform) {
   let peer = state.peers.get(userId);
   if (!peer) {
-    peer = { nickname: nickname || userId.slice(0, 6), expectedKinds: new Set() };
+    peer = {
+      nickname: nickname || userId.slice(0, 6),
+      clientPlatform: clientPlatform || 'desktop',
+      expectedKinds: new Set(),
+    };
     state.peers.set(userId, peer);
-  } else if (nickname) {
-    peer.nickname = nickname;
+  } else {
+    if (nickname) peer.nickname = nickname;
+    if (clientPlatform) peer.clientPlatform = clientPlatform;
   }
   if (!peer.expectedKinds) peer.expectedKinds = new Set();
   return peer;
@@ -434,6 +452,7 @@ async function startPullingPeerStream(userId, nickname, kind, { preemptive = fal
   ui.upsertTile(tileKey, {
     nickname: peer.nickname,
     isScreen: kind === 'screen',
+    sourcePlatform: peer.clientPlatform,
   });
 
   const pullGen = (peer[`${kind}PullGen`] || 0) + 1;

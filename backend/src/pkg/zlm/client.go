@@ -418,3 +418,190 @@ func (c *Client) GetMediaList() ([]MediaInfo, error) {
 	}
 	return parsed.Data, nil
 }
+
+// APIBase returns the configured ZLM HTTP API base URL.
+func (c *Client) APIBase() string {
+	return c.cfg.APIBase
+}
+
+type zlmResponse[T any] struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data T      `json:"data"`
+}
+
+// ThreadLoad describes one ZLM worker thread load sample.
+type ThreadLoad struct {
+	Delay int `json:"delay"`
+	Load  int `json:"load"`
+}
+
+// VersionInfo is ZLM build metadata from /index/api/version.
+type VersionInfo struct {
+	BranchName string `json:"branchName"`
+	BuildTime  string `json:"buildTime"`
+	CommitHash string `json:"commitHash"`
+}
+
+// StatisticInfo is a subset of ZLM internal object counts.
+type StatisticInfo struct {
+	MediaSource           uint64 `json:"mediaSource"`
+	MultiMediaSourceMuxer uint64 `json:"multiMediaSourceMuxer"`
+	Socket                uint64 `json:"socket"`
+	TcpSession            uint64 `json:"tcpSession"`
+	Buffer                uint64 `json:"buffer"`
+}
+
+// MediaMonitorSnapshot aggregates ZLM health metrics for the admin dashboard.
+type MediaMonitorSnapshot struct {
+	Status              string         `json:"status"`
+	APIBase             string         `json:"apiBase"`
+	Error               string         `json:"error,omitempty"`
+	ThreadLoadAvg       float64        `json:"threadLoadAvg"`
+	NetworkThreadLoad   float64        `json:"networkThreadLoad"`
+	WorkThreadLoad      float64        `json:"workThreadLoad"`
+	NetworkThreadCount  int            `json:"networkThreadCount"`
+	WorkThreadCount     int            `json:"workThreadCount"`
+	Statistic           StatisticInfo  `json:"statistic"`
+	Version             VersionInfo    `json:"version"`
+}
+
+func (c *Client) getSecretJSON(path string, out any) error {
+	q := url.Values{}
+	q.Set("secret", c.cfg.Secret)
+	endpoint := strings.TrimRight(c.cfg.APIBase, "/") + path + "?" + q.Encode()
+	resp, err := c.httpClient.Get(endpoint)
+	if err != nil {
+		return fmt.Errorf("call %s: %w", path, err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read %s response: %w", path, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("zlm %s http %d: %s", path, resp.StatusCode, string(body))
+	}
+	if err := json.Unmarshal(body, out); err != nil {
+		return fmt.Errorf("decode %s: %w (raw=%s)", path, err, string(body))
+	}
+	return nil
+}
+
+// GetThreadsLoad returns ZLM network poller thread loads.
+func (c *Client) GetThreadsLoad() ([]ThreadLoad, error) {
+	var parsed zlmResponse[[]ThreadLoad]
+	if err := c.getSecretJSON("/index/api/getThreadsLoad", &parsed); err != nil {
+		return nil, err
+	}
+	if parsed.Code != 0 {
+		return nil, fmt.Errorf("zlm getThreadsLoad error code=%d msg=%s", parsed.Code, parsed.Msg)
+	}
+	return parsed.Data, nil
+}
+
+// GetWorkThreadsLoad returns ZLM background worker thread loads.
+func (c *Client) GetWorkThreadsLoad() ([]ThreadLoad, error) {
+	var parsed zlmResponse[[]ThreadLoad]
+	if err := c.getSecretJSON("/index/api/getWorkThreadsLoad", &parsed); err != nil {
+		return nil, err
+	}
+	if parsed.Code != 0 {
+		return nil, fmt.Errorf("zlm getWorkThreadsLoad error code=%d msg=%s", parsed.Code, parsed.Msg)
+	}
+	return parsed.Data, nil
+}
+
+// GetStatistic returns ZLM internal object counts.
+func (c *Client) GetStatistic() (StatisticInfo, error) {
+	var parsed zlmResponse[map[string]uint64]
+	if err := c.getSecretJSON("/index/api/getStatistic", &parsed); err != nil {
+		return StatisticInfo{}, err
+	}
+	if parsed.Code != 0 {
+		return StatisticInfo{}, fmt.Errorf("zlm getStatistic error code=%d msg=%s", parsed.Code, parsed.Msg)
+	}
+	raw := parsed.Data
+	return StatisticInfo{
+		MediaSource:           raw["MediaSource"],
+		MultiMediaSourceMuxer: raw["MultiMediaSourceMuxer"],
+		Socket:                raw["Socket"],
+		TcpSession:            raw["TcpSession"],
+		Buffer:                raw["Buffer"],
+	}, nil
+}
+
+// GetVersion returns ZLM build metadata.
+func (c *Client) GetVersion() (VersionInfo, error) {
+	var parsed zlmResponse[VersionInfo]
+	if err := c.getSecretJSON("/index/api/version", &parsed); err != nil {
+		return VersionInfo{}, err
+	}
+	if parsed.Code != 0 {
+		return VersionInfo{}, fmt.Errorf("zlm version error code=%d msg=%s", parsed.Code, parsed.Msg)
+	}
+	return parsed.Data, nil
+}
+
+func avgThreadLoad(items []ThreadLoad) float64 {
+	if len(items) == 0 {
+		return 0
+	}
+	var sum int
+	for _, item := range items {
+		sum += item.Load
+	}
+	return float64(sum) / float64(len(items))
+}
+
+// MonitorSnapshot probes ZLM and returns dashboard media metrics.
+func (c *Client) MonitorSnapshot() MediaMonitorSnapshot {
+	out := MediaMonitorSnapshot{
+		Status:  "offline",
+		APIBase: c.cfg.APIBase,
+	}
+
+	version, err := c.GetVersion()
+	if err != nil {
+		out.Error = err.Error()
+		return out
+	}
+	out.Status = "online"
+	out.Version = version
+
+	if loads, err := c.GetThreadsLoad(); err == nil {
+		out.NetworkThreadCount = len(loads)
+		out.NetworkThreadLoad = avgThreadLoad(loads)
+	} else if out.Error == "" {
+		out.Error = err.Error()
+	}
+
+	if loads, err := c.GetWorkThreadsLoad(); err == nil {
+		out.WorkThreadCount = len(loads)
+		out.WorkThreadLoad = avgThreadLoad(loads)
+	} else if out.Error == "" {
+		out.Error = err.Error()
+	}
+
+	var loadSum float64
+	var loadCount int
+	if out.NetworkThreadCount > 0 {
+		loadSum += out.NetworkThreadLoad * float64(out.NetworkThreadCount)
+		loadCount += out.NetworkThreadCount
+	}
+	if out.WorkThreadCount > 0 {
+		loadSum += out.WorkThreadLoad * float64(out.WorkThreadCount)
+		loadCount += out.WorkThreadCount
+	}
+	if loadCount > 0 {
+		out.ThreadLoadAvg = loadSum / float64(loadCount)
+	}
+
+	if stat, err := c.GetStatistic(); err == nil {
+		out.Statistic = stat
+	} else if out.Error == "" {
+		out.Error = err.Error()
+	}
+
+	return out
+}

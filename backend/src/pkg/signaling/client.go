@@ -29,6 +29,7 @@ type Client struct {
 	Nickname string
 	soloRole         string // SoloRolePush | SoloRolePlay when in a solo room
 	plannedStreamID  string // intended stream name for solo push before publish
+	clientPlatform   string // ios | android | desktop — for viewer mirror correction
 
 	hub  *Hub
 	room *Room
@@ -41,11 +42,19 @@ type Client struct {
 	micOn      bool
 	camOn      bool
 	streams    map[string]string // kind -> streamId currently published
+	pulling    map[string]pullEntry
 	recordings map[string]bool   // kind -> recording on/off
 	isObserver bool
 	adminToken string
 	adminUser  string
+	observeAudit func(action, room, detail string)
 	closed     bool
+}
+
+type pullEntry struct {
+	streamID     string
+	kind         string
+	targetUserID string
 }
 
 func newClient(conn *websocket.Conn, hub *Hub) *Client {
@@ -55,6 +64,7 @@ func newClient(conn *websocket.Conn, hub *Hub) *Client {
 		conn:       conn,
 		sendCh:     make(chan []byte, 32),
 		streams:    make(map[string]string),
+		pulling:    make(map[string]pullEntry),
 		recordings: make(map[string]bool),
 		micOn:      true,
 		camOn:      true,
@@ -68,6 +78,7 @@ func NewObserveClient(hub *Hub, deliver func(msgType, reqID string, payload any)
 		hub:        hub,
 		deliver:    deliver,
 		streams:    make(map[string]string),
+		pulling:    make(map[string]pullEntry),
 		recordings: make(map[string]bool),
 	}
 }
@@ -79,6 +90,57 @@ func (c *Client) LeaveRoom() {
 		c.room = nil
 		r.removeClient(c)
 	}
+}
+
+// ForceKick notifies the client and closes its WebSocket, or removes it directly.
+func (c *Client) ForceKick(reason string) {
+	if reason == "" {
+		reason = "您已被管理员移出"
+	}
+	c.mu.RLock()
+	hasConn := c.conn != nil
+	c.mu.RUnlock()
+	if hasConn {
+		c.send(TypeAdminKicked, "", AdminKickedPayload{Message: reason})
+		_ = c.conn.Close()
+		return
+	}
+	c.LeaveRoom()
+}
+
+func (c *Client) recordPull(streamID, kind, targetUserID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.pulling == nil {
+		c.pulling = make(map[string]pullEntry)
+	}
+	key := kind
+	if kind == "solo" {
+		key = "solo:" + streamID
+	}
+	c.pulling[key] = pullEntry{
+		streamID:     streamID,
+		kind:         kind,
+		targetUserID: targetUserID,
+	}
+}
+
+// PullSnapshot returns active pull sessions for admin dashboards.
+func (c *Client) PullSnapshot() []PullBrief {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if len(c.pulling) == 0 {
+		return nil
+	}
+	out := make([]PullBrief, 0, len(c.pulling))
+	for _, p := range c.pulling {
+		out = append(out, PullBrief{
+			Kind:         p.kind,
+			StreamID:     p.streamID,
+			TargetUserID: p.targetUserID,
+		})
+	}
+	return out
 }
 
 // ServeWS upgrades an HTTP connection and runs read/write loops.
@@ -253,17 +315,46 @@ func (c *Client) IsObserver() bool {
 }
 
 // SetObserver marks the client as an admin observer for session tracking.
-func (c *Client) SetObserver(adminToken, adminUser string) {
+func (c *Client) SetObserver(adminToken, adminUser string, auditFn func(action, room, detail string)) {
 	c.mu.Lock()
 	c.isObserver = true
 	c.adminToken = adminToken
 	c.adminUser = adminUser
+	c.observeAudit = auditFn
 	suffix := c.UserID
 	if len(suffix) > 8 {
 		suffix = suffix[:8]
 	}
 	c.Nickname = "observer-" + suffix
 	c.mu.Unlock()
+}
+
+func (c *Client) recordObserveAudit(action, detail string) {
+	c.mu.RLock()
+	fn := c.observeAudit
+	room := c.room
+	c.mu.RUnlock()
+	if fn == nil || room == nil || detail == "" {
+		return
+	}
+	fn(action, room.ID, detail)
+}
+
+func (c *Client) observePlayDetail(p WebRTCOfferPayload) string {
+	if c.room == nil {
+		return ""
+	}
+	switch p.Mode {
+	case "play":
+		return c.room.ClientNickname(p.TargetUserID)
+	case "play-solo":
+		if nick := c.room.StreamOwnerNickname(p.StreamID); nick != "" {
+			return nick
+		}
+		return p.StreamID
+	default:
+		return ""
+	}
 }
 
 // AdminToken returns the admin session token when this is an observer client.
@@ -286,6 +377,17 @@ func decodePayload[T any](env *Envelope, dst *T) error {
 }
 
 // --- handlers -----------------------------------------------------------------
+
+func normalizeClientPlatform(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "ios", "iphone", "ipad", "ipod":
+		return "ios"
+	case "android":
+		return "android"
+	default:
+		return "desktop"
+	}
+}
 
 func (c *Client) handleJoin(env *Envelope) error {
 	if c.room != nil {
@@ -334,6 +436,7 @@ func (c *Client) handleJoin(env *Envelope) error {
 		}
 	}
 	c.Nickname = p.Nickname
+	c.clientPlatform = normalizeClientPlatform(p.ClientPlatform)
 	if p.MicOn != nil {
 		c.mu.Lock()
 		c.micOn = *p.MicOn
@@ -493,6 +596,18 @@ func (c *Client) handleWebRTCOffer(env *Envelope) error {
 		c.mu.Unlock()
 		c.room.broadcastStreamStarted(c, "solo", streamID)
 		c.hub.notifyStatsChanged()
+	case "play":
+		c.recordPull(streamID, p.Kind, p.TargetUserID)
+		c.hub.notifyStatsChanged()
+		if c.IsObserver() {
+			c.recordObserveAudit("observe_start", c.observePlayDetail(p))
+		}
+	case "play-solo":
+		c.recordPull(streamID, "solo", "")
+		c.hub.notifyStatsChanged()
+		if c.IsObserver() {
+			c.recordObserveAudit("observe_start", c.observePlayDetail(p))
+		}
 	}
 
 	c.send(TypeWebRTCAnswer, env.ReqID, WebRTCAnswerPayload{

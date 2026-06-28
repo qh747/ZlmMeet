@@ -13,6 +13,7 @@ type ClientBrief struct {
 	Streams         []StreamInfo `json:"streams"`
 	Recording       bool         `json:"recording"`
 	IsObserver      bool         `json:"isObserver,omitempty"`
+	ClientPlatform  string       `json:"clientPlatform,omitempty"`
 }
 
 // RoomStats summarizes one active room.
@@ -82,6 +83,7 @@ func (h *Hub) StatsSnapshot() HubStats {
 				CamOn:           c.camOn,
 				Recording:       recording,
 				IsObserver:      isObs,
+				ClientPlatform:  c.clientPlatform,
 				Streams:         make([]StreamInfo, 0, len(c.streams)),
 			}
 			for kind, sid := range c.streams {

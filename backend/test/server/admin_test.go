@@ -173,6 +173,20 @@ func TestAdminDashboardAcceptsValidToken(t *testing.T) {
 	if payload["type"] != "dashboard" {
 		t.Fatalf("type = %v", payload["type"])
 	}
+	signaling, ok := payload["signaling"].(map[string]any)
+	if !ok {
+		t.Fatal("expected signaling object")
+	}
+	if signaling["status"] != "running" {
+		t.Fatalf("signaling status = %v", signaling["status"])
+	}
+	media, ok := payload["media"].(map[string]any)
+	if !ok {
+		t.Fatal("expected media object")
+	}
+	if media["status"] != "offline" {
+		t.Fatalf("media status = %v", media["status"])
+	}
 }
 
 func TestAdminSecondLoginInvalidatesFirstToken(t *testing.T) {

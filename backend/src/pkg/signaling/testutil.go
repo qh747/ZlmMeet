@@ -11,6 +11,7 @@ func NewTestClient(userID, nickname string, streams map[string]string) *Client {
 		UserID:     userID,
 		Nickname:   nickname,
 		streams:    streams,
+		pulling:    make(map[string]pullEntry),
 		recordings: make(map[string]bool),
 	}
 }

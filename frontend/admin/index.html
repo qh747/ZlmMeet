@@ -72,6 +72,10 @@
           <span class="admin-nav-dot" aria-hidden="true"></span>
           <span class="admin-nav-label">房间监控</span>
         </button>
+        <button type="button" class="admin-nav-item" data-page="audit" id="auditTab">
+          <span class="admin-nav-dot" aria-hidden="true"></span>
+          <span class="admin-nav-label">操作日志</span>
+        </button>
       </nav>
       <div class="admin-sidebar-footer">
         <div id="sessionDuration" class="admin-sidebar-session-time" aria-live="polite" aria-label="已登录时长"></div>
@@ -80,7 +84,10 @@
 
     <main class="admin-main">
       <section id="dashboardPage" class="admin-page active">
-        <div class="admin-room-cards" id="roomCards"></div>
+        <div class="admin-dashboard-cards">
+          <div class="admin-service-cards" id="serviceCards"></div>
+          <div class="admin-room-cards" id="roomCards"></div>
+        </div>
       </section>
 
       <section id="monitorPage" class="admin-page" aria-hidden="true">
@@ -88,15 +95,19 @@
           <button type="button" class="admin-monitor-tab active" data-monitor-tab="rooms" role="tab" aria-selected="true">
             <span class="admin-monitor-tab-label">房间列表</span>
           </button>
+          <button type="button" class="admin-monitor-tab" data-monitor-tab="members" role="tab" aria-selected="false">
+            <span class="admin-monitor-tab-label">成员列表</span>
+          </button>
           <button type="button" class="admin-monitor-tab" data-monitor-tab="live" role="tab" aria-selected="false">
             <span class="admin-monitor-tab-label">实时画面</span>
-            <span class="admin-monitor-tab-badge" id="liveCount">0/9</span>
+            <span class="admin-monitor-tab-badge" id="liveCount">0/16</span>
           </button>
         </div>
 
+        <div id="monitorListPanels" class="admin-monitor-list-panels">
         <div id="monitorRoomsPanel" class="admin-monitor-panel active" role="tabpanel">
           <div class="admin-monitor-filter">
-            <div class="admin-monitor-filter-fields">
+            <div class="admin-monitor-filter-fields admin-monitor-filter-fields--rooms">
               <label class="admin-monitor-field">
                 <span class="admin-monitor-field-label">业务类型</span>
                 <select id="monitorTypeFilter" aria-label="业务类型">
@@ -121,7 +132,6 @@
                     <th>业务类型</th>
                     <th>房间名</th>
                     <th>在线人数</th>
-                    <th>录制</th>
                     <th>操作</th>
                   </tr>
                 </thead>
@@ -153,14 +163,188 @@
             </nav>
           </div>
         </div>
+
+        <div id="monitorMembersPanel" class="admin-monitor-panel" role="tabpanel" hidden>
+          <div class="admin-monitor-filter">
+            <div class="admin-monitor-filter-fields admin-monitor-filter-fields--members">
+              <label class="admin-monitor-field">
+                <span class="admin-monitor-field-label">业务类型</span>
+                <select id="monitorMemberTypeFilter" aria-label="业务类型">
+                  <option value="">全部</option>
+                  <option value="meeting">视频会议</option>
+                  <option value="call">1v1 通话</option>
+                  <option value="push">推流</option>
+                  <option value="pull">拉流</option>
+                </select>
+              </label>
+              <label class="admin-monitor-field admin-monitor-field--room">
+                <span class="admin-monitor-field-label">房间名称</span>
+                <input id="monitorMemberRoomSearch" type="text" placeholder="输入房间名称" autocomplete="off" />
+              </label>
+              <label class="admin-monitor-field admin-monitor-field--member">
+                <span class="admin-monitor-field-label">成员名称</span>
+                <input id="monitorMemberSearch" type="text" placeholder="输入成员名称" autocomplete="off" />
+              </label>
+              <button type="button" id="monitorMemberSearchBtn" class="admin-monitor-search-btn">搜索</button>
+            </div>
+          </div>
+          <div class="admin-monitor-list-section">
+            <div class="admin-monitor-table-wrap">
+              <table class="admin-monitor-table">
+                <thead>
+                  <tr>
+                    <th>业务类型</th>
+                    <th>房间名</th>
+                    <th>成员名</th>
+                    <th>流信息</th>
+                    <th>流状态</th>
+                    <th>录制</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="monitorMemberTableBody"></tbody>
+              </table>
+              <p id="monitorMemberEmpty" class="admin-monitor-empty" hidden>暂无成员数据</p>
+            </div>
+            <nav id="monitorMemberPagination" class="admin-monitor-pagination" aria-label="成员列表分页" hidden>
+              <span class="admin-monitor-page-info" id="monitorMemberPageInfo"></span>
+              <div class="admin-monitor-page-actions">
+                <button type="button" id="monitorMemberPagePrev" class="admin-monitor-page-btn">上一页</button>
+                <button type="button" id="monitorMemberPageNext" class="admin-monitor-page-btn">下一页</button>
+                <label class="admin-monitor-page-jump">
+                  <span>第</span>
+                  <input id="monitorMemberPageInput" type="number" min="1" value="1" inputmode="numeric" aria-label="页码" />
+                  <span>页</span>
+                </label>
+                <button type="button" id="monitorMemberPageGo" class="admin-monitor-page-btn admin-monitor-page-btn--go">跳转</button>
+                <label class="admin-monitor-page-size">
+                  <span>每页</span>
+                  <select id="monitorMemberPageSize" aria-label="每页条数">
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                  </select>
+                  <span>条</span>
+                </label>
+              </div>
+            </nav>
+          </div>
+        </div>
+        </div>
+      </section>
+
+      <section id="auditPage" class="admin-page" aria-hidden="true">
+        <div class="admin-audit-toolbar">
+          <button type="button" id="auditRefreshBtn" class="admin-audit-toolbar-btn">刷新</button>
+          <button type="button" id="auditClearBtn" class="admin-audit-toolbar-btn admin-audit-toolbar-btn--danger">清空</button>
+        </div>
+        <div class="admin-monitor-list-section admin-audit-list-section">
+          <div class="admin-monitor-table-wrap">
+            <table class="admin-monitor-table admin-audit-table">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>管理员</th>
+                  <th>操作</th>
+                  <th>房间</th>
+                  <th>详情</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody"></tbody>
+            </table>
+            <p id="auditEmpty" class="admin-monitor-empty" hidden>暂无操作记录</p>
+          </div>
+          <nav id="auditPagination" class="admin-monitor-pagination" aria-label="操作日志分页" hidden>
+            <span class="admin-monitor-page-info" id="auditPageInfo"></span>
+            <div class="admin-monitor-page-actions">
+              <button type="button" id="auditPagePrev" class="admin-monitor-page-btn">上一页</button>
+              <button type="button" id="auditPageNext" class="admin-monitor-page-btn">下一页</button>
+              <label class="admin-monitor-page-jump">
+                <span>第</span>
+                <input id="auditPageInput" type="number" min="1" value="1" inputmode="numeric" aria-label="页码" />
+                <span>页</span>
+              </label>
+              <button type="button" id="auditPageGo" class="admin-monitor-page-btn admin-monitor-page-btn--go">跳转</button>
+              <label class="admin-monitor-page-size">
+                <span>每页</span>
+                <select id="auditPageSize" aria-label="每页条数">
+                  <option value="5">5</option>
+                  <option value="10" selected>10</option>
+                  <option value="20">20</option>
+                </select>
+                <span>条</span>
+              </label>
+            </div>
+          </nav>
+        </div>
       </section>
 
       <div id="monitorLivePanel" class="admin-monitor-live-section" role="tabpanel" hidden aria-hidden="true">
+        <div class="admin-watch-toolbar">
+          <div class="admin-watch-toolbar-field admin-watch-toolbar-field--layout">
+            <span class="admin-watch-toolbar-label">布局</span>
+            <div id="watchLayoutPicker" class="admin-watch-layout-picker" role="radiogroup" aria-label="画面布局">
+              <button type="button" class="admin-watch-layout-btn active" data-layout="2x2" role="radio" aria-checked="true" aria-label="2×2 布局" title="2×2">
+                <span class="admin-watch-layout-icon admin-watch-layout-icon--2x2" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+              </button>
+              <button type="button" class="admin-watch-layout-btn" data-layout="2x3" role="radio" aria-checked="false" aria-label="2×3 布局" title="2×3">
+                <span class="admin-watch-layout-icon admin-watch-layout-icon--2x3" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              </button>
+              <button type="button" class="admin-watch-layout-btn" data-layout="3x2" role="radio" aria-checked="false" aria-label="3×2 布局" title="3×2">
+                <span class="admin-watch-layout-icon admin-watch-layout-icon--3x2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              </button>
+              <button type="button" class="admin-watch-layout-btn" data-layout="3x3" role="radio" aria-checked="false" aria-label="3×3 布局" title="3×3">
+                <span class="admin-watch-layout-icon admin-watch-layout-icon--3x3" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              </button>
+              <button type="button" class="admin-watch-layout-btn" data-layout="4x4" role="radio" aria-checked="false" aria-label="4×4 布局" title="4×4">
+                <span class="admin-watch-layout-icon admin-watch-layout-icon--4x4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              </button>
+            </div>
+          </div>
+          <label class="admin-watch-toolbar-field admin-watch-toolbar-field--interval">
+            <span class="admin-watch-toolbar-label">轮播间隔</span>
+            <span class="admin-watch-interval-control">
+              <input id="watchCarouselInterval" type="number" min="5" max="60" value="5" inputmode="numeric" aria-label="轮播间隔（秒）" />
+              <span class="admin-watch-toolbar-suffix">秒</span>
+            </span>
+          </label>
+        </div>
         <div class="admin-watch-stage">
-          <div class="admin-watch-grid" id="watchGrid"></div>
+          <div class="admin-watch-grid admin-watch-grid--2x2" id="watchGrid"></div>
         </div>
       </div>
     </main>
+
+    <dialog id="adminConfirmDialog" class="admin-member-dialog admin-confirm-dialog">
+      <div class="admin-member-dialog-inner">
+        <header class="admin-member-dialog-head">
+          <h2 class="admin-member-dialog-title" id="adminConfirmTitle">请确认</h2>
+          <div class="shell-title-divider admin-member-dialog-divider" aria-hidden="true"></div>
+          <p class="admin-member-dialog-room" id="adminConfirmMessage"></p>
+        </header>
+        <footer class="admin-member-dialog-actions">
+          <button type="button" class="admin-secondary" id="adminConfirmCancel">取消</button>
+          <button type="button" class="admin-primary" id="adminConfirmOk">确定</button>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog id="roomViewDialog" class="admin-member-dialog">
+      <div class="admin-member-dialog-inner">
+        <header class="admin-member-dialog-head">
+          <h2 class="admin-member-dialog-title">房间成员</h2>
+          <div class="shell-title-divider admin-member-dialog-divider" aria-hidden="true"></div>
+          <p class="admin-member-dialog-room" id="roomViewRoom"></p>
+        </header>
+        <div class="admin-member-dialog-body">
+          <ul id="roomViewList" class="admin-member-pick-list admin-room-view-list"></ul>
+          <p id="roomViewEmpty" class="admin-monitor-empty" hidden>暂无成员</p>
+        </div>
+        <footer class="admin-member-dialog-actions">
+          <button type="button" class="admin-secondary" id="roomViewClose">关闭</button>
+        </footer>
+      </div>
+    </dialog>
 
     <dialog id="memberPickDialog" class="admin-member-dialog">
       <div class="admin-member-dialog-inner">

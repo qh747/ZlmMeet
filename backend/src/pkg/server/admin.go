@@ -21,7 +21,7 @@ func NewAdmin(cfg *config.Config, hub *signaling.Hub, auth *adminauth.Auth) http
 	mux := http.NewServeMux()
 	audit := NewAuditLog(200)
 	observeMgr := newObserveSessionManager(hub, auth, audit)
-	dashboardHub := newAdminDashboardHub(hub, auth, observeMgr)
+	dashboardHub := newAdminDashboardHub(hub, auth, observeMgr, audit)
 	originCheck := buildOriginChecker(cfg.AllowedOrigins)
 
 	mux.HandleFunc("/api/admin/login", func(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +58,7 @@ func NewAdmin(cfg *config.Config, hub *signaling.Hub, auth *adminauth.Auth) http
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(buildDashboardPayload(hub, true))
+		_ = json.NewEncoder(w).Encode(buildDashboardPayload(hub, audit, true))
 	}))
 
 	mux.HandleFunc("/api/admin/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -89,13 +89,108 @@ func NewAdmin(cfg *config.Config, hub *signaling.Hub, auth *adminauth.Auth) http
 	})
 
 	mux.Handle("/api/admin/audit-log", requireAdmin(auth, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Method {
+		case http.MethodGet:
+			_ = json.NewEncoder(w).Encode(map[string]any{"entries": audit.Recent(audit.max)})
+		case http.MethodDelete:
+			audit.Clear()
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	mux.Handle("/api/admin/members", requireAdmin(auth, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		limit := 50
+		members, zlmErr := buildMemberSnapshot(hub)
+		if members == nil {
+			members = []signaling.MemberRow{}
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"entries": audit.Recent(limit)})
+		payload := map[string]any{"members": members}
+		if zlmErr != "" {
+			payload["zlmError"] = zlmErr
+		}
+		_ = json.NewEncoder(w).Encode(payload)
+	}))
+
+	mux.Handle("/api/admin/rooms/kick", requireAdmin(auth, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		token := strings.TrimSpace(r.Header.Get(adminTokenHeader))
+		username, err := auth.ValidateToken(token)
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "message": err.Error()})
+			return
+		}
+		var req struct {
+			Room   string `json:"room"`
+			UserID string `json:"userId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "message": "bad request"})
+			return
+		}
+		req.Room = strings.TrimSpace(req.Room)
+		req.UserID = strings.TrimSpace(req.UserID)
+		if req.Room == "" || req.UserID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "message": "room and userId are required"})
+			return
+		}
+		nickname, err := hub.KickMember(req.Room, req.UserID, "您已被管理员移出")
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "message": err.Error()})
+			return
+		}
+		audit.Record(username, "kick_member", req.Room, nickname)
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
+	}))
+
+	mux.Handle("/api/admin/rooms/dissolve", requireAdmin(auth, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		token := strings.TrimSpace(r.Header.Get(adminTokenHeader))
+		username, err := auth.ValidateToken(token)
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "message": err.Error()})
+			return
+		}
+		var req struct {
+			Room string `json:"room"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "message": "bad request"})
+			return
+		}
+		req.Room = strings.TrimSpace(req.Room)
+		if req.Room == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "message": "room is required"})
+			return
+		}
+		if err := hub.DissolveRoom(req.Room, "房间已被管理员解散"); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "message": err.Error()})
+			return
+		}
+		audit.Record(username, "dissolve_room", req.Room, req.Room)
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 	}))
 
 	mux.HandleFunc("/api/admin/observe/ws", func(w http.ResponseWriter, r *http.Request) {

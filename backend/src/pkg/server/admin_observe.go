@@ -166,8 +166,23 @@ func (oc *observeConn) readLoop() {
 				oc.sendError(err.Error())
 			}
 		case signaling.TypeObserveLeave:
-			oc.leaveRoom("client leave")
+			oc.leaveRoom()
 			oc.pushRaw(map[string]any{"type": "observe-left", "ok": true})
+		case signaling.TypeObserveWatchStop:
+			if oc.client == nil || oc.roomID == "" {
+				continue
+			}
+			var p signaling.ObserveWatchStopPayload
+			if len(env.Payload) > 0 {
+				if err := json.Unmarshal(env.Payload, &p); err != nil {
+					oc.sendError("bad observe-watch-stop payload")
+					continue
+				}
+			}
+			detail := strings.TrimSpace(p.Detail)
+			if detail != "" {
+				oc.mgr.audit.Record(oc.username, "observe_stop", oc.roomID, detail)
+			}
 		case signaling.TypeWebRTCOffer:
 			if oc.client == nil {
 				oc.sendError("not observing a room")
@@ -212,13 +227,14 @@ func (oc *observeConn) handleObserveJoin(env *signaling.Envelope) error {
 	}
 
 	client := signaling.NewObserveClient(oc.mgr.hub, oc.deliver)
-	client.SetObserver(oc.token, oc.username)
+	client.SetObserver(oc.token, oc.username, func(action, room, detail string) {
+		oc.mgr.audit.Record(oc.username, action, room, detail)
+	})
 	if err := oc.mgr.hub.AddObserverClient(room.ID, client); err != nil {
 		return err
 	}
 	oc.client = client
 	oc.roomID = room.ID
-	oc.mgr.audit.Record(oc.username, "observe_start", room.ID, room.Mode)
 	return nil
 }
 
@@ -230,22 +246,18 @@ func (oc *observeConn) deliver(msgType, reqID string, payload any) {
 	oc.pushRaw(signaling.Envelope{Type: msgType, ReqID: reqID, Payload: body})
 }
 
-func (oc *observeConn) leaveRoom(reason string) {
+func (oc *observeConn) leaveRoom() {
 	if oc.client == nil {
 		return
 	}
-	roomID := oc.roomID
 	oc.client.LeaveRoom()
 	oc.client = nil
 	oc.roomID = ""
-	if reason != "" && roomID != "" {
-		oc.mgr.audit.Record(oc.username, "observe_stop", roomID, reason)
-	}
 }
 
 func (oc *observeConn) closeConn() {
 	oc.closeOnce.Do(func() {
-		oc.leaveRoom("disconnect")
+		oc.leaveRoom()
 		oc.mgr.unregister(oc)
 		close(oc.send)
 		_ = oc.conn.Close()

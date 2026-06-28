@@ -80,4 +80,18 @@ func TestAdminAuditLogAPI(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status=%d", res.StatusCode)
 	}
+
+	delReq, err := http.NewRequest(http.MethodDelete, ts.URL+"/api/admin/audit-log", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delReq.Header.Set(adminTokenHeader, token)
+	delRes, err := http.DefaultClient.Do(delReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer delRes.Body.Close()
+	if delRes.StatusCode != http.StatusOK {
+		t.Fatalf("delete status=%d", delRes.StatusCode)
+	}
 }

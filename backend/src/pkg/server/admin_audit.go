@@ -18,9 +18,10 @@ type AuditEntry struct {
 
 // AuditLog keeps a bounded in-memory audit trail for the admin API.
 type AuditLog struct {
-	mu      sync.Mutex
-	entries []AuditEntry
-	max     int
+	mu       sync.Mutex
+	entries  []AuditEntry
+	max      int
+	onChange func()
 }
 
 func NewAuditLog(max int) *AuditLog {
@@ -28,6 +29,13 @@ func NewAuditLog(max int) *AuditLog {
 		max = 200
 	}
 	return &AuditLog{max: max}
+}
+
+// SetChangeHook is invoked after each new audit entry is recorded.
+func (l *AuditLog) SetChangeHook(fn func()) {
+	l.mu.Lock()
+	l.onChange = fn
+	l.mu.Unlock()
 }
 
 func (l *AuditLog) Record(username, action, room, detail string) {
@@ -43,6 +51,7 @@ func (l *AuditLog) Record(username, action, room, detail string) {
 	if len(l.entries) > l.max {
 		l.entries = l.entries[len(l.entries)-l.max:]
 	}
+	onChange := l.onChange
 	l.mu.Unlock()
 
 	log.Info().
@@ -51,6 +60,10 @@ func (l *AuditLog) Record(username, action, room, detail string) {
 		Str("room", room).
 		Str("detail", detail).
 		Msg("admin audit")
+
+	if onChange != nil {
+		onChange()
+	}
 }
 
 func (l *AuditLog) Recent(limit int) []AuditEntry {
@@ -60,7 +73,7 @@ func (l *AuditLog) Recent(limit int) []AuditEntry {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if len(l.entries) == 0 {
-		return nil
+		return []AuditEntry{}
 	}
 	start := 0
 	if len(l.entries) > limit {
@@ -69,4 +82,15 @@ func (l *AuditLog) Recent(limit int) []AuditEntry {
 	out := make([]AuditEntry, len(l.entries)-start)
 	copy(out, l.entries[start:])
 	return out
+}
+
+// Clear removes all audit entries and notifies subscribers.
+func (l *AuditLog) Clear() {
+	l.mu.Lock()
+	l.entries = []AuditEntry{}
+	onChange := l.onChange
+	l.mu.Unlock()
+	if onChange != nil {
+		onChange()
+	}
 }

@@ -1,5 +1,7 @@
 // ui.js — DOM helpers for the meeting page: video tiles, chat log, status bar.
 
+import { shouldMirrorVideo } from './video-flip.js';
+
 const MEETING_ASPECT = 16 / 9;
 const FOCUS_COL_GAP = 3;
 const FOCUS_THUMB_GAP = 4;
@@ -151,7 +153,20 @@ export class MeetingUI {
       video.autoplay = true;
       video.playsInline = true;
       if (opts.isSelf) video.muted = true; // never echo our own mic
-      tile.appendChild(video);
+
+      const mirror = shouldMirrorVideo({
+        isSelf: !!opts.isSelf,
+        isScreen: !!opts.isScreen,
+        sourcePlatform: opts.sourcePlatform,
+      });
+      if (mirror) {
+        const mirrorWrap = document.createElement('div');
+        mirrorWrap.className = 'video-flip-x';
+        mirrorWrap.appendChild(video);
+        tile.appendChild(mirrorWrap);
+      } else {
+        tile.appendChild(video);
+      }
 
       const nameTag = document.createElement('div');
       nameTag.className = 'name-tag';

@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"zlm_meet/backend/pkg/adminauth"
+	"zlm_meet/backend/pkg/hoststats"
 	"zlm_meet/backend/pkg/signaling"
 )
 
@@ -26,6 +27,7 @@ type adminDashboardHub struct {
 	hub      *signaling.Hub
 	auth     *adminauth.Auth
 	observe  *observeSessionManager
+	audit    *AuditLog
 	mu       sync.Mutex
 	clients  map[*adminWSClient]struct{}
 	debounce *time.Timer
@@ -38,51 +40,48 @@ type adminWSClient struct {
 	token  string
 }
 
-func newAdminDashboardHub(hub *signaling.Hub, auth *adminauth.Auth, observe *observeSessionManager) *adminDashboardHub {
+func newAdminDashboardHub(hub *signaling.Hub, auth *adminauth.Auth, observe *observeSessionManager, audit *AuditLog) *adminDashboardHub {
 	d := &adminDashboardHub{
 		hub:     hub,
 		auth:    auth,
 		observe: observe,
+		audit:   audit,
 		clients: make(map[*adminWSClient]struct{}),
 	}
 	auth.SetKickHandler(d.kickByToken)
 	hub.SetStatsChangeHook(d.scheduleHubPush)
+	if audit != nil {
+		audit.SetChangeHook(d.broadcastAudit)
+	}
 	return d
 }
 
-func buildDashboardPayload(hub *signaling.Hub, includeZLM bool) map[string]any {
+func buildDashboardPayload(hub *signaling.Hub, audit *AuditLog, includeMedia bool) map[string]any {
 	hubStats := hub.StatsSnapshot()
+	hs := hoststats.Sample()
 	payload := map[string]any{
 		"type": "dashboard",
 		"hub":  hubStats,
+		"signaling": map[string]any{
+			"status":                 "running",
+			"cpuUsagePercent":        hs.CPUUsagePercent,
+			"memUsedBytes":           hs.MemUsedBytes,
+			"memTotalBytes":          hs.MemTotalBytes,
+			"memUsagePercent":        hs.MemUsagePercent,
+			"processCpuUsagePercent": hs.ProcessCPUUsagePercent,
+			"processRssBytes":        hs.ProcessRSSBytes,
+			"goHeapBytes":            hs.GoHeapBytes,
+			"goroutineCount":         hs.GoroutineCount,
+			"openFdCount":            hs.OpenFDCount,
+			"uptimeSeconds":          hs.UptimeSeconds,
+			"supported":              hs.Supported,
+		},
 	}
-	if !includeZLM {
-		return payload
+	if audit != nil {
+		payload["audit"] = audit.Recent(50)
 	}
-
-	var zlmStreams []interface{}
-	var zlmError string
-	media, err := hub.ZLM().GetMediaList()
-	if err != nil {
-		zlmError = err.Error()
-		log.Warn().Err(err).Msg("admin getMediaList")
-	} else {
-		zlmStreams = make([]interface{}, len(media))
-		for i, m := range media {
-			zlmStreams[i] = m
-		}
-	}
-
-	uniqueStreams := make(map[string]struct{})
-	for _, m := range media {
-		uniqueStreams[m.App+"/"+m.Stream] = struct{}{}
-	}
-
-	payload["zlm"] = map[string]any{
-		"streamCount": len(uniqueStreams),
-		"mediaCount":  len(media),
-		"streams":     zlmStreams,
-		"error":       zlmError,
+	if includeMedia {
+		payload["media"] = hub.ZLM().MonitorSnapshot()
 	}
 	return payload
 }
@@ -102,9 +101,24 @@ func (d *adminDashboardHub) scheduleHubPush() {
 }
 
 func (d *adminDashboardHub) broadcastHub() {
-	raw, err := json.Marshal(buildDashboardPayload(d.hub, false))
+	raw, err := json.Marshal(buildDashboardPayload(d.hub, d.audit, false))
 	if err != nil {
 		log.Warn().Err(err).Msg("admin dashboard marshal")
+		return
+	}
+	d.broadcast(raw)
+}
+
+func (d *adminDashboardHub) broadcastAudit() {
+	if d.audit == nil {
+		return
+	}
+	raw, err := json.Marshal(map[string]any{
+		"type":    "audit",
+		"entries": d.audit.Recent(50),
+	})
+	if err != nil {
+		log.Warn().Err(err).Msg("admin audit marshal")
 		return
 	}
 	d.broadcast(raw)
@@ -252,8 +266,8 @@ func (c *adminWSClient) writeLoop() {
 	}
 }
 
-func (c *adminWSClient) pushSnapshot(includeZLM bool) {
-	raw, err := json.Marshal(buildDashboardPayload(c.parent.hub, includeZLM))
+func (c *adminWSClient) pushSnapshot(includeMedia bool) {
+	raw, err := json.Marshal(buildDashboardPayload(c.parent.hub, c.parent.audit, includeMedia))
 	if err != nil {
 		log.Warn().Err(err).Msg("admin dashboard marshal")
 		return

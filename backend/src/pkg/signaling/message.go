@@ -37,6 +37,8 @@ type JoinPayload struct {
 	Token    string `json:"token,omitempty"`
 	MicOn    *bool  `json:"micOn,omitempty"`
 	CamOn    *bool  `json:"camOn,omitempty"`
+	// ClientPlatform helps viewers correct camera mirroring (ios | android | desktop).
+	ClientPlatform string `json:"clientPlatform,omitempty"`
 }
 
 // s2c joined: confirms join + lists existing peers (and their published streams).
@@ -45,6 +47,8 @@ type PeerInfo struct {
 	Nickname string `json:"nickname"`
 	MicOn    bool   `json:"micOn"`
 	CamOn    bool   `json:"camOn"`
+	// ClientPlatform is the publisher client OS family (ios | android | desktop).
+	ClientPlatform string `json:"clientPlatform,omitempty"`
 	// StreamIDs the peer is currently publishing (e.g. "cam", "screen").
 	Streams []StreamInfo `json:"streams"`
 }
@@ -52,6 +56,28 @@ type PeerInfo struct {
 type StreamInfo struct {
 	Kind     string `json:"kind"`     // "cam" or "screen"
 	StreamID string `json:"streamId"` // full ZLM stream name
+}
+
+// PullBrief describes one active pull session on a client.
+type PullBrief struct {
+	Kind         string `json:"kind"`
+	StreamID     string `json:"streamId"`
+	TargetUserID string `json:"targetUserId,omitempty"`
+}
+
+// MemberRow is one admin member-list entry (publish or pull).
+type MemberRow struct {
+	Biz          string `json:"biz"`
+	RoomID       string `json:"roomId"`
+	RoomDisplay  string `json:"roomDisplay"`
+	UserID       string `json:"userId"`
+	Nickname     string `json:"nickname"`
+	StreamKind   string `json:"streamKind,omitempty"`
+	StreamID     string `json:"streamId,omitempty"`
+	StreamLabel  string `json:"streamLabel"`
+	StreamOnline bool   `json:"streamOnline"`
+	Recording    bool   `json:"recording"`
+	ClientPlatform string `json:"clientPlatform,omitempty"`
 }
 
 type JoinedPayload struct {
@@ -66,6 +92,7 @@ type PeerJoinedPayload struct {
 	Nickname string `json:"nickname"`
 	MicOn    bool   `json:"micOn"`
 	CamOn    bool   `json:"camOn"`
+	ClientPlatform string `json:"clientPlatform,omitempty"`
 }
 
 // s2c peer-left
@@ -178,8 +205,9 @@ const (
 	TypeStreamStopped = "stream-stopped"
 	TypeRecordStart   = "record-start"
 	TypeRecordStop    = "record-stop"
-	TypeObserveJoin   = "observe-join"
-	TypeObserveLeave  = "observe-leave"
+	TypeObserveJoin       = "observe-join"
+	TypeObserveLeave      = "observe-leave"
+	TypeObserveWatchStop  = "observe-watch-stop"
 
 	// server → client
 	TypeJoined            = "joined"
@@ -193,13 +221,24 @@ const (
 	TypeObserveJoined     = "observe-joined"
 	TypeObserveEnded      = "observe-ended"
 	TypeObserveError      = "observe-error"
+	TypeAdminKicked       = "admin-kicked"
 	TypeError             = "error"
 )
+
+// AdminKickedPayload is sent when an admin force-removes a business client.
+type AdminKickedPayload struct {
+	Message string `json:"message,omitempty"`
+}
 
 // ObserveJoinPayload is sent by admin clients to enter a room as a silent observer.
 type ObserveJoinPayload struct {
 	Room string `json:"room"`
 	Mode string `json:"mode"` // meeting | call | solo
+}
+
+// ObserveWatchStopPayload reports that the admin stopped watching a member stream.
+type ObserveWatchStopPayload struct {
+	Detail string `json:"detail"`
 }
 
 // ObserveEndedPayload is sent when the watched business ends.
